@@ -1,0 +1,28 @@
+# ==================================================
+# Power Infrastructure
+#
+# Preventive power cycling for devices that
+# require periodic resets to maintain reliability.
+# ==================================================
+
+automation:
+  # --------------------------------------------------
+  # Kitchen Vent Hood – Daily Power Reset
+  #
+  # Purpose:
+  #   Prevent electronics lock-up by briefly
+  #   cycling power once per day.
+  # --------------------------------------------------
+  - id: power_vent_hood_daily_reset
+    alias: "Powerline - Kitchen Vent Hood Daily Reset"
+    trigger:
+      - platform: time
+        at: "05:00:00"
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.vent_hood_reset
+      - delay: "00:00:15"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.vent_hood_reset

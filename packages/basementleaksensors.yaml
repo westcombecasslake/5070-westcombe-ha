@@ -1,0 +1,171 @@
+###############################################################################
+# BASEMENT LEAK SENSORS
+###############################################################################
+#
+# PURPOSE:
+# Emergency water leak detection for 3 basement areas. Sends immediate
+# house alerts on detection and maintains Android Auto status helper.
+#
+# SENSORS MONITORED:
+# - Hot Water Heater area
+# - Sump Pump area
+# - Well area
+#
+# SIREN:
+# The whole-house siren (YoLink YS7103-UC) is triggered directly by YoLink's
+# alarm group when any leak sensor fires. This is handled natively by YoLink,
+# not by HA automation. No HA scene call needed.
+#
+# STATUS HELPER:
+# input_text.leak_sensor_status - Android Auto display
+# Updated immediately on detection, cleared via script when all sensors clear.
+# Script checks all 3 sensors before resetting to Normal (no partial clears).
+#
+# CLEARED NOTIFICATION:
+# No Pushover notification on clear - status resets silently.
+# All-clear is visible via status helper and daily summary.
+#
+# NOTIFICATIONS:
+# - house_alerts (emergency priority) on any leak detection
+#
+###############################################################################
+
+# --------------------------------------------------
+# Leak Status Helper (visible to all YAML files)
+# --------------------------------------------------
+input_text:
+  leak_sensor_status:
+    name: "Leak Sensor Status"
+    initial: "✅ Normal"
+
+# --------------------------------------------------
+# Leak Detection Automations
+# --------------------------------------------------
+automation:
+  # --------------------------------------------------
+  # Leak Detected - Hot Water Heater
+  # --------------------------------------------------
+  - id: basement_leak_hot_water_heater_detected
+    alias: "Leak - Hot Water Heater Detected"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.hot_water_heater_leak_sensor_moisture
+        to: "on"
+    action:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.leak_sensor_status
+        data:
+          value: "🚨 Leak Detected"
+      - action: notify.house_alerts
+        data:
+          title: "EMERGENCY - Water Leak Detected"
+          message: |
+            Location: Hot Water Heater
+            Status: MOISTURE DETECTED
+            Action: CHECK IMMEDIATELY
+
+  # --------------------------------------------------
+  # Leak Cleared - Hot Water Heater
+  # --------------------------------------------------
+  - id: basement_leak_hot_water_heater_cleared
+    alias: "Leak - Hot Water Heater Cleared"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.hot_water_heater_leak_sensor_moisture
+        to: "off"
+        for: "00:02:00"
+    action:
+      - action: script.basement_leak_status_update
+
+  # --------------------------------------------------
+  # Leak Detected - Sump Pump Area
+  # --------------------------------------------------
+  - id: basement_leak_sump_pump_detected
+    alias: "Leak - Sump Pump Area Detected"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.sump_leak_sensor_moisture
+        to: "on"
+    action:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.leak_sensor_status
+        data:
+          value: "🚨 Leak Detected"
+      - action: notify.house_alerts
+        data:
+          title: "EMERGENCY - Water Leak Detected"
+          message: |
+            Location: Sump Pump Area
+            Status: MOISTURE DETECTED
+            Action: CHECK IMMEDIATELY
+
+  # --------------------------------------------------
+  # Leak Cleared - Sump Pump Area
+  # --------------------------------------------------
+  - id: basement_leak_sump_pump_cleared
+    alias: "Leak - Sump Pump Area Cleared"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.sump_leak_sensor_moisture
+        to: "off"
+        for: "00:02:00"
+    action:
+      - action: script.basement_leak_status_update
+
+  # --------------------------------------------------
+  # Leak Detected - Well Area
+  # --------------------------------------------------
+  - id: basement_leak_well_area_detected
+    alias: "Leak - Well Area Detected"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.well_leak_sensor_moisture
+        to: "on"
+    action:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.leak_sensor_status
+        data:
+          value: "🚨 Leak Detected"
+      - action: notify.house_alerts
+        data:
+          title: "EMERGENCY - Water Leak Detected"
+          message: |
+            Location: Well Area
+            Status: MOISTURE DETECTED
+            Action: CHECK IMMEDIATELY
+
+  # --------------------------------------------------
+  # Leak Cleared - Well Area
+  # --------------------------------------------------
+  - id: basement_leak_well_area_cleared
+    alias: "Leak - Well Area Cleared"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.well_leak_sensor_moisture
+        to: "off"
+        for: "00:02:00"
+    action:
+      - action: script.basement_leak_status_update
+
+# --------------------------------------------------
+# Helper Script - Update Leak Status
+# --------------------------------------------------
+script:
+  basement_leak_status_update:
+    alias: "Basement Leak Status Update"
+    sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.leak_sensor_status
+        data:
+          value: >
+            {% if is_state('binary_sensor.hot_water_heater_leak_sensor_moisture', 'on') or
+                  is_state('binary_sensor.sump_leak_sensor_moisture', 'on') or
+                  is_state('binary_sensor.well_leak_sensor_moisture', 'on') %}
+              🚨 Leak Detected
+            {% else %}
+              ✅ Normal
+            {% endif %}

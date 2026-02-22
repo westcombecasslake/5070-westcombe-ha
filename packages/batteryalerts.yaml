@@ -1,0 +1,189 @@
+# ==================================================
+# Battery Monitoring Package
+#
+# Monitors battery levels and sends tiered alerts
+# Provides helper for Android Auto status display
+# ==================================================
+
+# --------------------------------------------------
+# Battery Status Helper (visible to all YAML files)
+# --------------------------------------------------
+input_text:
+  battery_status:
+    name: "Battery Status"
+
+# --------------------------------------------------
+# Scripts
+# --------------------------------------------------
+script:
+  battery_status_report:
+    alias: "Battery Status Report"
+    sequence:
+      - action: notify.battery_alerts
+        data:
+          title: "Battery Status Report"
+          message: >
+            {% set ns = namespace(msg='') %}
+            {% for state in states.sensor %}
+              {% if '_battery' in state.entity_id and state.state | int(0) <= 30 and state.state | int(0) > 0 %}
+                {% set ns.msg = ns.msg + state.attributes.friendly_name + ': ' + state.state + '%\n' %}
+              {% endif %}
+            {% endfor %}
+            {% if ns.msg == '' %}All batteries above 30%{% else %}{{ ns.msg }}{% endif %}
+
+  update_battery_status:
+    alias: "Update Battery Status"
+    sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.battery_status
+        data:
+          value: >
+            {% set battery_sensors = [
+              states('sensor.front_door_battery'),
+              states('sensor.basement_humidity_sensor_battery'),
+              states('sensor.basement_smoke_co_battery'),
+              states('sensor.south_bedroom_smoke_alarm_battery'),
+              states('sensor.den_smoke_alarm_battery'),
+              states('sensor.dining_room_smoke_co_alarm_battery'),
+              states('sensor.fire_co_alarm_battery'),
+              states('sensor.garage_freezer_temp_battery'),
+              states('sensor.garage_fridge_temp_battery'),
+              states('sensor.garage_motion_sensor_battery'),
+              states('sensor.garage_smoke_alarm_battery'),
+              states('sensor.kitchen_freezer_temp_battery'),
+              states('sensor.kitchen_fridge_temp_battery'),
+              states('sensor.laundry_temp_humidity_sensor_battery'),
+              states('sensor.master_bath_temp_humidity_sensor_battery'),
+              states('sensor.master_bedroom_smoke_co_alarm_battery'),
+              states('sensor.office_smoke_alarm_battery'),
+              states('sensor.sarah_bedroom_smoke_alarm_battery'),
+              states('sensor.sump_pump_depth_alert_battery'),
+              states('sensor.hot_water_heater_leak_sensor_battery'),
+              states('sensor.sump_leak_sensor_battery'),
+              states('sensor.sump_pump_running_battery'),
+              states('sensor.well_leak_sensor_battery')
+            ] %}
+            {% set critical = battery_sensors | select('is_number') | map('int') | select('lt', 15) | list | length > 0 %}
+            {% set low = battery_sensors | select('is_number') | map('int') | select('lt', 30) | list | length > 0 %}
+            {% if critical %}
+              Critical
+            {% elif low %}
+              Low
+            {% else %}
+              Normal
+            {% endif %}
+
+# --------------------------------------------------
+# Automations
+# --------------------------------------------------
+automation:
+  # =============================================================================
+  # 30% LOW BATTERY WARNING (Normal Priority)
+  # =============================================================================
+  - id: battery_low_30_percent
+    alias: "Battery - 30% Low Warning"
+    description: "Early warning to order replacement batteries"
+    mode: parallel
+    trigger:
+      - platform: numeric_state
+        entity_id:
+          - sensor.front_door_battery
+          - sensor.basement_humidity_sensor_battery
+          - sensor.basement_smoke_co_battery
+          - sensor.south_bedroom_smoke_alarm_battery
+          - sensor.den_smoke_alarm_battery
+          - sensor.dining_room_smoke_co_alarm_battery
+          - sensor.fire_co_alarm_battery
+          - sensor.garage_freezer_temp_battery
+          - sensor.garage_fridge_temp_battery
+          - sensor.garage_motion_sensor_battery
+          - sensor.garage_smoke_alarm_battery
+          - sensor.kitchen_freezer_temp_battery
+          - sensor.kitchen_fridge_temp_battery
+          - sensor.laundry_temp_humidity_sensor_battery
+          - sensor.master_bath_temp_humidity_sensor_battery
+          - sensor.master_bedroom_smoke_co_alarm_battery
+          - sensor.office_smoke_alarm_battery
+          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.sump_pump_depth_alert_battery
+          - sensor.hot_water_heater_leak_sensor_battery
+          - sensor.sump_leak_sensor_battery
+          - sensor.sump_pump_running_battery
+          - sensor.well_leak_sensor_battery
+        below: 30
+        for:
+          minutes: 5
+    condition:
+      # Only alert if battery is above 15% (to avoid duplicate with critical alert)
+      - condition: template
+        value_template: "{{ trigger.to_state.state | int(0) > 15 }}"
+    action:
+      - service: notify.battery_alerts
+        data:
+          title: "Low Battery Warning"
+          message: |
+            Device: {{ state_attr(trigger.entity_id, 'friendly_name') }}
+            Battery Level: {{ states(trigger.entity_id) }}%
+            
+            Order replacement battery
+      - service: script.update_battery_status
+
+  # =============================================================================
+  # 15% CRITICAL BATTERY ALERT (High Priority - HOUSE ALERTS)
+  # =============================================================================
+  - id: battery_critical_15_percent
+    alias: "Battery - 15% Critical Alert"
+    description: "Urgent warning to replace battery immediately - routes to House Alerts"
+    mode: parallel
+    trigger:
+      - platform: numeric_state
+        entity_id:
+          - sensor.front_door_battery
+          - sensor.basement_humidity_sensor_battery
+          - sensor.basement_smoke_co_battery
+          - sensor.south_bedroom_smoke_alarm_battery
+          - sensor.den_smoke_alarm_battery
+          - sensor.dining_room_smoke_co_alarm_battery
+          - sensor.fire_co_alarm_battery
+          - sensor.garage_freezer_temp_battery
+          - sensor.garage_fridge_temp_battery
+          - sensor.garage_motion_sensor_battery
+          - sensor.garage_smoke_alarm_battery
+          - sensor.kitchen_freezer_temp_battery
+          - sensor.kitchen_fridge_temp_battery
+          - sensor.laundry_temp_humidity_sensor_battery
+          - sensor.master_bath_temp_humidity_sensor_battery
+          - sensor.master_bedroom_smoke_co_alarm_battery
+          - sensor.office_smoke_alarm_battery
+          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.sump_pump_depth_alert_battery
+          - sensor.hot_water_heater_leak_sensor_battery
+          - sensor.sump_leak_sensor_battery
+          - sensor.sump_pump_running_battery
+          - sensor.well_leak_sensor_battery
+        below: 15
+        for:
+          minutes: 5
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "CRITICAL Battery Alert"
+          message: |
+            Device: {{ state_attr(trigger.entity_id, 'friendly_name') }}
+            Battery Level: {{ states(trigger.entity_id) }}%
+            
+            REPLACE IMMEDIATELY
+      - service: script.update_battery_status
+
+  # =============================================================================
+  # DAILY BATTERY STATUS UPDATE
+  # =============================================================================
+  - id: battery_status_daily_update
+    alias: "Battery - Daily Status Update"
+    description: "Update battery status helper every morning"
+    trigger:
+      - platform: time
+        at: "08:00:00"
+    action:
+      - service: script.update_battery_status

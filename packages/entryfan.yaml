@@ -1,0 +1,37 @@
+###############################################################################
+# ENTRY BATHROOM FAN AUTOMATION
+###############################################################################
+#
+# PURPOSE:
+# Automatically turns off entry bathroom fan after a timed delay to prevent
+# it from running indefinitely if manually left on.
+#
+# OPERATION:
+# - Triggers when fan is turned on (manually via switch)
+# - Waits 12 minutes
+# - Automatically turns fan off
+#
+# BENEFITS:
+# - Prevents wasted energy from forgotten fans
+# - Ensures adequate ventilation time (12 min per activation)
+# - No manual intervention needed
+#
+###############################################################################
+
+automation:
+  - id: entry_fan_auto_off
+    alias: "Entry Bath - Fan Auto-Off"
+    mode: restart
+    trigger:
+      # Trigger: Fan switch turned on
+      - platform: state
+        entity_id: light.entry_bath_fan
+        to: "on"
+    action:
+      # Wait 12 minutes (adequate ventilation time)
+      - delay: "00:12:00"
+
+      # Auto-shutoff: Turn fan off after timer expires
+      - service: light.turn_off
+        target:
+          entity_id: light.entry_bath_fan

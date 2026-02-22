@@ -1,0 +1,183 @@
+################################################################################
+# HUMIDIFIER PAD MONITORING SYSTEM
+################################################################################
+# Monitors main floor humidity trends and alerts when pad needs replacement
+#
+# Features:
+# - 7-day and 14-day rolling averages to filter HVAC cycles
+# - Baseline tracking (good pad performance level)
+# - Automatic pad change detection via humidity spike
+# - Declining trend early warning
+# - Below-baseline degradation alerts
+#
+# Requirements:
+# - Ecobee sensor: sensor.main_floor_current_humidity
+# - Notifications via Pushover (see Operational Log, House Alerts, House Notices)
+#
+# Alerts:
+# - Low humidity sustained (critical - pad needs replacement)
+# - Humidity well below baseline (degraded performance)
+# - Declining trend warning (early heads-up)
+#
+# Notes:
+# - Statistics sensors need 7 days to populate after first setup
+# - Baseline set to 44% based on Jan 25, 2026 good pad performance
+# - Auto-detection triggers on humidity spike >50% for 30+ minutes
+################################################################################
+
+input_number:
+  humidifier_baseline:
+    name: "Humidity Baseline (Good Pad)"
+    min: 30
+    max: 60
+    step: 0.5
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+
+input_datetime:
+  last_humidifier_pad_change:
+    name: "Last Humidifier Pad Change"
+    has_date: true
+    has_time: true
+    icon: mdi:air-filter
+
+sensor:
+  # 7-day rolling average to smooth out HVAC cycles
+  - platform: statistics
+    name: "Main Floor Humidity 7-Day Average"
+    entity_id: sensor.main_floor_current_humidity
+    state_characteristic: mean
+    max_age:
+      days: 7
+    sampling_size: 1000
+
+  # 14-day average for longer-term comparison
+  - platform: statistics
+    name: "Main Floor Humidity 14-Day Average"
+    entity_id: sensor.main_floor_current_humidity
+    state_characteristic: mean
+    max_age:
+      days: 14
+    sampling_size: 2000
+
+binary_sensor:
+  # Detects declining trend
+  - platform: trend
+    sensors:
+      main_humidity_declining:
+        entity_id: sensor.main_floor_humidity_7_day_average
+        sample_duration: 604800 # 7 days
+        min_gradient: -0.03 # Negative = declining
+        friendly_name: "Main Floor Humidity Declining"
+
+automation:
+  - id: humidifier_pad_low_humidity_alert
+    alias: Humidifier Pad Low Humidity Alert
+    description: Critical alert when 7-day average drops below comfort level for 48+ hours
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.main_floor_humidity_7_day_average
+        below: 36
+        for:
+          hours: 48
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "⚠️ Humidifier Pad Needs Replacement"
+          message: |
+            Main floor humidity critically low for 48+ hours
+
+            7-day average: {{ states('sensor.main_floor_humidity_7_day_average') }}%
+            14-day average: {{ states('sensor.main_floor_humidity_14_day_average') }}%
+            Current: {{ states('sensor.main_floor_current_humidity') }}%
+            Baseline: {{ states('input_number.humidifier_baseline') }}%
+
+            Replace humidifier pad
+
+  - id: humidifier_pad_below_baseline_warning
+    alias: Humidifier Pad Below Baseline Warning
+    description: Alert when humidity drops significantly below baseline for 3+ days
+    mode: single
+    trigger:
+      - platform: template
+        value_template: >
+          {% set current = states('sensor.main_floor_humidity_7_day_average') | float(0) %}
+          {% set baseline = states('input_number.humidifier_baseline') | float(44) %}
+          {{ current < (baseline - 8) and current < 40 }}
+        for:
+          days: 3
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "⚠️ Humidity Well Below Baseline"
+          message: |
+            Main floor humidity degraded for 3+ days
+
+            Baseline: {{ states('input_number.humidifier_baseline') }}%
+            Current 7-day avg: {{ states('sensor.main_floor_humidity_7_day_average') }}%
+            Difference: {{ (states('input_number.humidifier_baseline')|float - states('sensor.main_floor_humidity_7_day_average')|float) | round(1) }}%
+
+            Humidifier pad effectiveness degraded
+
+  - id: humidifier_pad_declining_trend_notice
+    alias: Humidifier Pad Declining Trend Notice
+    description: Early warning when humidity trends downward for 5+ days
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.main_humidity_declining
+        to: "on"
+        for:
+          days: 5
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.main_floor_humidity_7_day_average
+        below: 40
+    action:
+      - service: notify.house_notices
+        data:
+          title: "ℹ️ Humidity Declining Trend"
+          message: |
+            Main floor humidity declining for 5+ days
+            7-day average: {{ states('sensor.main_floor_humidity_7_day_average') }}%
+
+            Watch for continued decline - may need pad change soon
+
+  - id: humidifier_pad_change_detected
+    alias: Humidifier Pad Change Detected
+    description: Auto-detect pad change via humidity spike and update baseline
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.main_floor_current_humidity
+        above: 50
+        for:
+          minutes: 30
+    condition:
+      # Only fire when HVAC is in heat mode — prevents false triggers
+      # from summer humidity on days when the humidifier isn't running
+      - condition: state
+        entity_id: climate.main_floor
+        state: "heat"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.last_humidifier_pad_change
+        data:
+          datetime: "{{ now() }}"
+      - delay:
+          hours: 24
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.humidifier_baseline
+        data:
+          value: "{{ states('sensor.main_floor_humidity_7_day_average') | float }}"
+      - service: notify.operational_log
+        data:
+          title: "✓ Humidifier Pad Change Detected"
+          message: |
+            Humidity spike detected - pad change logged
+
+            Date: {{ now().strftime('%B %d, %Y at %I:%M %p') }}
+            New baseline: {{ states('sensor.main_floor_humidity_7_day_average') }}%

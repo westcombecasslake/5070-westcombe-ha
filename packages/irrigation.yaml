@@ -1,0 +1,174 @@
+###############################################################################
+# IRRIGATION
+###############################################################################
+#
+# PURPOSE:
+# Controls single-zone back patio drip irrigation via Insteon outlet.
+# Weather-aware scheduling with manual override and deadman safety.
+#
+# OPERATION:
+# - System enable helper (input_boolean) acts as seasonal on/off switch
+# - Daily runtime calculated at 6 AM based on temperature forecast
+# - Automatic cycle runs at 7:45 AM if system enabled and no rain forecast
+# - Manual 30-minute run available via dashboard button
+# - Deadman safety forces shutoff if valve stays on 60+ minutes
+#
+# WEATHER SKIP:
+# - Skips if weather state is rainy/pouring/lightning-rainy/snowy-rainy
+# - PoP threshold helper (irrigation_pop_threshold) is defined but not yet
+#   wired into skip logic - currently display-only in notifications.
+#   Post-deployment: wire PoP threshold into condition to skip if forecast
+#   probability of precipitation exceeds threshold value.
+#
+# NOTIFICATIONS:
+# - operational_log: automatic cycle start
+# - house_notices: manual run start
+# - house_alerts: deadman safety triggered
+#
+###############################################################################
+
+input_boolean:
+  irrigation_system_enabled:
+    name: Irrigation System Enabled
+    icon: mdi:water-check
+
+input_number:
+  irrigation_zone_runtime:
+    name: Irrigation Zone Runtime
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: "min"
+
+  irrigation_pop_threshold:
+    name: Irrigation PoP Threshold
+    min: 0
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+    icon: mdi:weather-rainy
+
+input_button:
+  irrigation_manual_30min:
+    name: Irrigation Manual Run (30 Minutes)
+    icon: mdi:sprinkler
+
+automation:
+  # --------------------------------------------------
+  # Irrigation - Calculate Daily Runtime
+  # --------------------------------------------------
+  - id: irrigation_calculate_runtime
+    alias: "Irrigation - Calculate Zone Runtime"
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_system_enabled
+        state: "on"
+    action:
+      - choose:
+          - conditions:
+              - condition: numeric_state
+                entity_id: weather.forecast_home_2
+                attribute: temperature
+                below: 80
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.irrigation_zone_runtime
+                data:
+                  value: 25
+        default:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.irrigation_zone_runtime
+            data:
+              value: 45
+
+  # --------------------------------------------------
+  # Irrigation - Automatic Morning Cycle
+  # --------------------------------------------------
+  - id: irrigation_automatic_morning_cycle
+    alias: "Irrigation - Automatic Morning Cycle"
+    trigger:
+      - platform: time
+        at: "07:45:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_system_enabled
+        state: "on"
+      - condition: template
+        value_template: >
+          {{ states('weather.forecast_home_2') not in ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] }}
+    action:
+      - service: notify.operational_log
+        data:
+          title: "Irrigation - Automatic Cycle Started"
+          message: >
+            Runtime: {{ states('input_number.irrigation_zone_runtime') | int }} minutes
+            Temperature: {{ state_attr('weather.forecast_home_2', 'temperature') }}°F
+            Weather: {{ states('weather.forecast_home_2') }}
+            PoP Threshold: {{ states('input_number.irrigation_pop_threshold') | int }}%
+            Start Time: {{ now().strftime('%I:%M %p') }}
+      - service: switch.turn_on
+        target:
+          entity_id: switch.patio_drip_sprinkler
+      - delay:
+          minutes: "{{ states('input_number.irrigation_zone_runtime') | int }}"
+      - service: switch.turn_off
+        target:
+          entity_id: switch.patio_drip_sprinkler
+
+  # --------------------------------------------------
+  # Irrigation - Manual 30-Minute Run
+  #
+  # Triggered via app / dashboard button
+  # --------------------------------------------------
+  - id: irrigation_manual_30min_run
+    alias: "Irrigation - Manual 30 Minute Run"
+    trigger:
+      - platform: state
+        entity_id: input_button.irrigation_manual_30min
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_system_enabled
+        state: "on"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "Irrigation - Manual Run Started"
+          message: >
+            Duration: 30 minutes
+            Start Time: {{ now().strftime('%I:%M %p') }}
+      - service: switch.turn_on
+        target:
+          entity_id: switch.patio_drip_sprinkler
+      - delay: "00:30:00"
+      - service: switch.turn_off
+        target:
+          entity_id: switch.patio_drip_sprinkler
+
+  # --------------------------------------------------
+  # Irrigation - Deadman Safety Off
+  # --------------------------------------------------
+  - id: irrigation_deadman_safety_off
+    alias: "Irrigation - Deadman Safety Off"
+    trigger:
+      - platform: state
+        entity_id: switch.patio_drip_sprinkler
+        to: "on"
+        for: "01:00:00"
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "⚠️ Irrigation - Deadman Safety Triggered"
+          message: >
+            Irrigation has been running for 60+ minutes!
+            Forcing shutoff for safety.
+
+            Check system for malfunction.
+            Time: {{ now().strftime('%I:%M %p') }}
+      - service: switch.turn_off
+        target:
+          entity_id: switch.patio_drip_sprinkler

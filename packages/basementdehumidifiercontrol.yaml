@@ -1,0 +1,122 @@
+###############################################################################
+# BASEMENT DEHUMIDIFIER CONTROL
+###############################################################################
+#
+# PURPOSE:
+# Controls dehumidifier outlet to maintain basement humidity in the 45-50%
+# range, with peak electricity hour avoidance Mon-Fri 3-7 PM.
+#
+# CONTROLS:
+# - switch.scheduled_power_save (Insteon outlet controlling dehumidifier)
+# - sensor.basement_humidity_sensor_humidity (YoLink sensor)
+#
+# OPERATION:
+# - Turns ON above 50% humidity (off-peak only on weekdays, anytime on weekends)
+# - Turns OFF below 45% humidity OR at 3 PM Mon-Fri (peak hours start)
+# - 5% hysteresis band (45-50%) prevents excessive on/off cycling
+# - Resumes normal operation after 7 PM on weekdays
+#
+# PEAK HOUR AVOIDANCE:
+# - Blocked: Mon-Fri 3:00 PM - 7:00 PM (utility peak rate period)
+# - Allowed: All other times including full weekends
+#
+# NOTIFICATIONS:
+# - Operational log on turn-on (humidity exceeded 50%)
+# - Operational log on turn-off (humidity below 45% or peak hour shutoff)
+#
+###############################################################################
+
+automation:
+  - id: basement_dehumidifier_on
+    alias: "Basement Dehumidifier - Turn On"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.basement_humidity_sensor_humidity
+        above: 50
+    condition:
+      # Allow on weekends anytime, or weekdays outside peak hours (3-7 PM)
+      - condition: or
+        conditions:
+          - condition: time
+            weekday:
+              - sat
+              - sun
+          - condition: and
+            conditions:
+              - condition: time
+                after: "19:00:00"
+                before: "15:00:00"
+              - condition: time
+                weekday:
+                  - mon
+                  - tue
+                  - wed
+                  - thu
+                  - fri
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.scheduled_power_save
+      - service: notify.operational_log
+        data:
+          title: "Basement Dehumidifier - High Humidity"
+          message: |
+            Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
+            Threshold: 50% (ON)
+            Status: Dehumidifier activated
+
+  - id: basement_dehumidifier_off
+    alias: "Basement Dehumidifier - Turn Off"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.basement_humidity_sensor_humidity
+        below: 45
+        id: humidity_trigger
+      - platform: time
+        at: "15:00:00"
+        id: time_trigger
+    condition:
+      - condition: or
+        conditions:
+          - condition: numeric_state
+            entity_id: sensor.basement_humidity_sensor_humidity
+            below: 45
+          - condition: and
+            conditions:
+              - condition: time
+                after: "15:00:00"
+                before: "19:00:00"
+              - condition: time
+                weekday:
+                  - mon
+                  - tue
+                  - wed
+                  - thu
+                  - fri
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.scheduled_power_save
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: humidity_trigger
+            sequence:
+              - service: notify.operational_log
+                data:
+                  title: "Basement Dehumidifier - Normal"
+                  message: |
+                    Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
+                    Threshold: 45% (OFF)
+                    Status: Dehumidifier deactivated
+          - conditions:
+              - condition: trigger
+                id: time_trigger
+            sequence:
+              - service: notify.operational_log
+                data:
+                  title: "Basement Dehumidifier - Peak Hours"
+                  message: |
+                    Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
+                    Status: Dehumidifier shut off for peak rate period (3-7 PM)
+                    Resumes: After 7:00 PM

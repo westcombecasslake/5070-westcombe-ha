@@ -1,0 +1,919 @@
+###############################################################################
+# AIR QUALITY MONITORING & CONTROL
+###############################################################################
+#
+# PURPOSE:
+# Comprehensive air quality management using IKEA Alpstuga sensors to monitor
+# CO2 and PM2.5 levels across two floors. Coordinates HVAC filtration and
+# exhaust ventilation to maintain healthy indoor air quality.
+#
+# FEATURES:
+# • PM2.5 filtration takes priority over all other HVAC fan automation
+# • CO2 managed via exhaust ventilation when PM2.5 levels allow
+# • Party mode enhanced monitoring with periodic reminders
+# • Daily air quality summaries with trend comparison
+# • Sensor offline detection
+# • Four-tier Pushover notification system
+#
+# HARDWARE:
+# • 2x IKEA Alpstuga sensors (CO2, PM2.5, TVOC)
+#   - Floor 1: Living area (sensor.living_area_co2, sensor.living_area_pm25)
+#   - Floor 2: Master bedroom (sensor.master_bedroom_co2, sensor.master_bedroom_pm25)
+# • HVAC fan with HEPA 13 + carbon filter (climate.ecobee via script)
+# • Exhaust fans: bathroom, laundry, kitchen hood
+#
+# THRESHOLDS (EPA/WHO Guidelines):
+# PM2.5 (μg/m³):
+#   - Good: 0-12
+#   - Moderate: 12-35
+#   - Unhealthy for sensitive: 35-55
+#   - Unhealthy: 55-150
+#   - Very unhealthy: 150-250
+#   - Hazardous: 250+
+#
+# CO2 (ppm):
+#   - Excellent: <800
+#   - Good: 800-1000
+#   - Acceptable: 1000-1500
+#   - Poor: 1500-2000
+#   - Very poor: >2000
+#
+# INTEGRATION PRIORITY:
+# PM2.5 filtration overrides bathroom/laundry fan automations.
+# Other automations should check input_boolean.pm25_filtration_active
+# before returning HVAC fan to AUTO mode.
+#
+###############################################################################
+
+# ==================================================
+# Helper Entities
+# ==================================================
+
+input_boolean:
+  pm25_filtration_active:
+    name: PM2.5 Filtration Active
+    icon: mdi:air-filter
+
+  party_mode:
+    name: Party Mode
+    icon: mdi:party-popper
+
+input_number:
+  # Daily statistics tracking
+  living_area_co2_max_today:
+    name: Living Area CO2 Max Today
+    min: 0
+    max: 5000
+    step: 1
+    unit_of_measurement: "ppm"
+    icon: mdi:molecule-co2
+
+  living_area_pm25_max_today:
+    name: Living Area PM2.5 Max Today
+    min: 0
+    max: 500
+    step: 0.1
+    unit_of_measurement: "μg/m³"
+    icon: mdi:air-filter
+
+  master_bedroom_co2_max_today:
+    name: Master Bedroom CO2 Max Today
+    min: 0
+    max: 5000
+    step: 1
+    unit_of_measurement: "ppm"
+    icon: mdi:molecule-co2
+
+  master_bedroom_pm25_max_today:
+    name: Master Bedroom PM2.5 Max Today
+    min: 0
+    max: 500
+    step: 0.1
+    unit_of_measurement: "μg/m³"
+    icon: mdi:air-filter
+
+  pm25_filter_events_today:
+    name: PM2.5 Filter Events Today
+    min: 0
+    max: 100
+    step: 1
+    icon: mdi:counter
+
+  pm25_filtration_start_time:
+    name: PM2.5 Filtration Start Time
+    min: 0
+    max: 9999999999
+    step: 1
+    mode: box
+
+  # Runtime tracking
+  pm25_filtration_runtime_today:
+    name: PM2.5 Filtration Runtime Today
+    min: 0
+    max: 1440  # Max 24 hours in minutes
+    step: 1
+    unit_of_measurement: "min"
+    icon: mdi:timer
+
+  # 7-day averages for trend comparison
+  pm25_filter_events_7day_avg:
+    name: PM2.5 Filter Events 7-Day Average
+    min: 0
+    max: 100
+    step: 0.1
+    icon: mdi:chart-line
+
+  living_area_co2_7day_avg:
+    name: Living Area CO2 7-Day Average
+    min: 0
+    max: 5000
+    step: 1
+    unit_of_measurement: "ppm"
+    icon: mdi:chart-line
+
+  living_area_pm25_7day_avg:
+    name: Living Area PM2.5 7-Day Average
+    min: 0
+    max: 500
+    step: 0.1
+    unit_of_measurement: "μg/m³"
+    icon: mdi:chart-line
+
+  master_bedroom_co2_7day_avg:
+    name: Master Bedroom CO2 7-Day Average
+    min: 0
+    max: 5000
+    step: 1
+    unit_of_measurement: "ppm"
+    icon: mdi:chart-line
+
+  master_bedroom_pm25_7day_avg:
+    name: Master Bedroom PM2.5 7-Day Average
+    min: 0
+    max: 500
+    step: 0.1
+    unit_of_measurement: "μg/m³"
+    icon: mdi:chart-line
+
+# ==================================================
+# PM2.5 Management (HIGHEST PRIORITY)
+# ==================================================
+
+automation:
+  # --------------------------------------------------
+  # PM2.5 — Elevated Detection
+  #
+  # Triggers HVAC filtration for unhealthy PM2.5 levels.
+  # This takes priority over all other HVAC fan automation.
+  # --------------------------------------------------
+  - id: air_quality_pm25_elevated
+    alias: "Air Quality - PM2.5 Elevated"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.living_area_pm25
+        above: 35  # Unhealthy for sensitive groups
+        for: "00:03:00"
+      - platform: numeric_state
+        entity_id: sensor.master_bedroom_pm25
+        above: 35
+        for: "00:03:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pm25_filtration_active
+        state: "off"
+    action:
+      # Activate filtration mode
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.pm25_filtration_active
+
+      # Store start time
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filtration_start_time
+        data:
+          value: "{{ as_timestamp(now()) }}"
+
+      # Increment event counter
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filter_events_today
+        data:
+          value: "{{ states('input_number.pm25_filter_events_today') | int(0) + 1 }}"
+
+      # Turn on HVAC fan for filtration
+      - service: climate.set_fan_mode
+        target:
+          device_id: c38113c2d02da790b689d4a3bdc4b5e1
+        data:
+          fan_mode: "on"
+
+      # Notify - severity based on level
+      - choose:
+          # Very Unhealthy (150+) - Emergency alert
+          - conditions:
+              - condition: or
+                conditions:
+                  - condition: numeric_state
+                    entity_id: sensor.living_area_pm25
+                    above: 150
+                  - condition: numeric_state
+                    entity_id: sensor.master_bedroom_pm25
+                    above: 150
+            sequence:
+              - service: notify.house_alerts
+                data:
+                  title: "⚠️ AIR QUALITY EMERGENCY"
+                  message: |
+                    PM2.5: {{ [states('sensor.living_area_pm25')|float(0), states('sensor.master_bedroom_pm25')|float(0)] | max }} μg/m³ (VERY UNHEALTHY)
+                    Floor 1: {{ states('sensor.living_area_pm25') }} μg/m³
+                    Floor 2: {{ states('sensor.master_bedroom_pm25') }} μg/m³
+                    
+                    ACTIONS REQUIRED:
+                    1. Close all windows/doors
+                    2. HVAC filter running
+                    3. Stay indoors
+                    4. Check air quality source
+
+          # Unhealthy (55-150) - High priority
+          - conditions:
+              - condition: or
+                conditions:
+                  - condition: numeric_state
+                    entity_id: sensor.living_area_pm25
+                    above: 55
+                  - condition: numeric_state
+                    entity_id: sensor.master_bedroom_pm25
+                    above: 55
+            sequence:
+              - service: notify.house_alerts
+                data:
+                  title: "⚠️ AIR QUALITY ALERT"
+                  message: |
+                    PM2.5: {{ [states('sensor.living_area_pm25')|float(0), states('sensor.master_bedroom_pm25')|float(0)] | max }} μg/m³ (UNHEALTHY)
+                    Floor 1: {{ states('sensor.living_area_pm25') }} μg/m³
+                    Floor 2: {{ states('sensor.master_bedroom_pm25') }} μg/m³
+                    
+                    HVAC filter activated
+                    Avoid outdoor air intake
+        default:
+          # Moderate (35-55) - Standard notice
+          - service: notify.house_notices
+            data:
+              title: "💨 Air Quality Alert"
+              message: |
+                PM2.5 elevated: {{ [states('sensor.living_area_pm25')|float(0), states('sensor.master_bedroom_pm25')|float(0)] | max }} μg/m³
+                Floor 1: {{ states('sensor.living_area_pm25') }} μg/m³
+                Floor 2: {{ states('sensor.master_bedroom_pm25') }} μg/m³
+                Threshold: Unhealthy for sensitive groups
+                
+                HVAC filter activated
+                Monitor air quality
+
+  # --------------------------------------------------
+  # PM2.5 — Filtration Continuation
+  #
+  # Keeps HVAC fan running while PM2.5 remains elevated.
+  # Runs every 10 minutes to ensure fan stays on.
+  # --------------------------------------------------
+  - id: air_quality_pm25_filter_continue
+    alias: "Air Quality - PM2.5 Filter Continue"
+    trigger:
+      - platform: time_pattern
+        minutes: "/10"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pm25_filtration_active
+        state: "on"
+      - condition: or
+        conditions:
+          - condition: numeric_state
+            entity_id: sensor.living_area_pm25
+            above: 12  # Good air quality threshold
+          - condition: numeric_state
+            entity_id: sensor.master_bedroom_pm25
+            above: 12
+    action:
+      # Keep HVAC fan running
+      - service: climate.set_fan_mode
+        target:
+          device_id: c38113c2d02da790b689d4a3bdc4b5e1
+        data:
+          fan_mode: "on"
+
+  # --------------------------------------------------
+  # PM2.5 — Return to Normal
+  #
+  # Deactivates filtration when both sensors show good air quality.
+  # Returns HVAC fan to AUTO mode.
+  # UPDATED: Now tracks runtime duration.
+  # --------------------------------------------------
+  - id: air_quality_pm25_normal
+    alias: "Air Quality - PM2.5 Normal"
+    trigger:
+      - platform: time_pattern
+        minutes: "/10"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pm25_filtration_active
+        state: "on"
+      - condition: numeric_state
+        entity_id: sensor.living_area_pm25
+        below: 12  # Good air quality
+      - condition: numeric_state
+        entity_id: sensor.master_bedroom_pm25
+        below: 12
+      # Must have been filtering for at least 15 minutes
+      - condition: template
+        value_template: "{{ (as_timestamp(now()) - states('input_number.pm25_filtration_start_time')|float(0)) > 900 }}"
+    action:
+      # Calculate and store runtime
+      - variables:
+          runtime_minutes: "{{ ((as_timestamp(now()) - states('input_number.pm25_filtration_start_time')|float(0)) / 60) | round(0) }}"
+
+      # Add runtime to today's total
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filtration_runtime_today
+        data:
+          value: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) + runtime_minutes|int(0) }}"
+
+      # Deactivate filtration mode
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pm25_filtration_active
+
+      # Return HVAC fan to auto
+      - service: climate.set_fan_mode
+        target:
+          device_id: c38113c2d02da790b689d4a3bdc4b5e1
+        data:
+          fan_mode: "auto"
+
+      # Notify
+      - service: notify.operational_log
+        data:
+          title: "✅ Air Quality Normal"
+          message: |
+            Floor 1: {{ states('sensor.living_area_co2') }} ppm CO2, {{ states('sensor.living_area_pm25') }} μg/m³ PM2.5
+            Floor 2: {{ states('sensor.master_bedroom_co2') }} ppm CO2, {{ states('sensor.master_bedroom_pm25') }} μg/m³ PM2.5
+            
+            HVAC filter returned to AUTO
+            Filtration duration: {{ runtime_minutes }} minutes
+
+  # --------------------------------------------------
+  # PM2.5 — Safety Timeout
+  #
+  # Returns to AUTO after 4 hours of continuous filtration
+  # to prevent excessive HVAC runtime if sensor stuck.
+  # UPDATED: Tracks runtime even on timeout.
+  # --------------------------------------------------
+  - id: air_quality_pm25_safety_timeout
+    alias: "Air Quality - PM2.5 Safety Timeout"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.pm25_filtration_active
+        to: "on"
+        for: "04:00:00"
+    action:
+      # Add 240 minutes (4 hours) to runtime
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filtration_runtime_today
+        data:
+          value: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) + 240 }}"
+
+      # Deactivate
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pm25_filtration_active
+
+      # Return to auto
+      - service: climate.set_fan_mode
+        target:
+          device_id: c38113c2d02da790b689d4a3bdc4b5e1
+        data:
+          fan_mode: "auto"
+
+      # Alert about timeout
+      - service: notify.house_notices
+        data:
+          title: "⚠️ PM2.5 Filtration Timeout"
+          message: |
+            4-hour filtration limit reached
+            Current levels:
+            Floor 1: {{ states('sensor.living_area_pm25') }} μg/m³
+            Floor 2: {{ states('sensor.master_bedroom_pm25') }} μg/m³
+            
+            Check sensors and air quality source
+
+# ==================================================
+# CO2 Management
+# ==================================================
+
+  # --------------------------------------------------
+  # CO2 — Critical Level (Emergency)
+  #
+  # Immediate alert for dangerous CO2 levels.
+  # --------------------------------------------------
+  - id: air_quality_co2_critical
+    alias: "Air Quality - CO2 Critical"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.living_area_co2
+        above: 2000
+        for: "00:05:00"
+      - platform: numeric_state
+        entity_id: sensor.master_bedroom_co2
+        above: 2000
+        for: "00:05:00"
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "⚠️ CO2 CRITICAL"
+          message: |
+            CO2: {{ trigger.to_state.state }} ppm
+            Location: {{ trigger.to_state.attributes.friendly_name }}
+            Time: {{ now().strftime('%I:%M %p') }}
+            
+            OPEN WINDOWS IMMEDIATELY
+            Consider evacuating room
+
+  # --------------------------------------------------
+  # CO2 — High Level (Ventilation Needed)
+  #
+  # Runs HVAC exhaust boost and notifies to open windows.
+  # Only when PM2.5 filtration is NOT active.
+  # --------------------------------------------------
+  - id: air_quality_co2_high_living_area
+    alias: "Air Quality - CO2 High Living Area"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.living_area_co2
+        above: 1000
+        for: "00:05:00"
+    condition:
+      # Don't run exhaust during PM2.5 filtration
+      - condition: state
+        entity_id: input_boolean.pm25_filtration_active
+        state: "off"
+      # Don't fight kitchen hood if it's running
+      - condition: state
+        entity_id: switch.vent_hood_reset
+        state: "on"
+    action:
+      # Run HVAC exhaust boost
+      - service: script.hvac_exhaust_boost
+
+      # Notify about opening windows
+      - service: notify.house_notices
+        data:
+          title: "🪟 Open Windows"
+          message: |
+            CO2: {{ states('sensor.living_area_co2') }} ppm
+            Location: Living Area
+            Outdoor temp: {{ states('sensor.ecobee_outdoor_temperature') }}°F
+            
+            Opening windows recommended
+            HVAC exhaust boost running (20 min)
+
+  - id: air_quality_co2_high_master_bedroom
+    alias: "Air Quality - CO2 High Master Bedroom"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.master_bedroom_co2
+        above: 1000
+        for: "00:05:00"
+    condition:
+      # Only during nighttime (bedroom occupied)
+      - condition: time
+        after: "21:00:00"
+        before: "07:00:00"
+      # Don't run during PM2.5 filtration
+      - condition: state
+        entity_id: input_boolean.pm25_filtration_active
+        state: "off"
+    action:
+      # Run bathroom fan for bedroom ventilation
+      - service: light.turn_on
+        target:
+          entity_id: light.master_bath_fan
+
+      # Auto-off after 20 minutes
+      - delay: "00:20:00"
+
+      - service: light.turn_off
+        target:
+          entity_id: light.master_bath_fan
+
+      # Notify
+      - service: notify.house_notices
+        data:
+          title: "🪟 Bedroom CO2 High"
+          message: |
+            CO2: {{ states('sensor.master_bedroom_co2') }} ppm
+            Time: {{ now().strftime('%I:%M %p') }}
+            
+            Master bath fan running (20 min)
+            Consider opening window
+
+# ==================================================
+# Party Mode Integration
+# ==================================================
+
+  # --------------------------------------------------
+  # Party Mode — Activate
+  #
+  # Enhanced ventilation when party mode enabled.
+  # --------------------------------------------------
+  - id: air_quality_party_mode_activate
+    alias: "Air Quality - Party Mode Activate"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.party_mode
+        to: "on"
+    action:
+      # Aggressive ventilation
+      - service: script.hvac_exhaust_boost
+
+      # Additional exhaust fan
+      - service: light.turn_on
+        target:
+          entity_id: light.entry_bath_fan
+
+      # Notify
+      - service: notify.house_notices
+        data:
+          title: "🎉 Party Mode Active"
+          message: |
+            Enhanced ventilation activated
+            HVAC exhaust boost running
+            Entry bath fan on
+            
+            Air quality monitoring increased
+
+  # --------------------------------------------------
+  # Party Mode — Periodic CO2 Check
+  #
+  # Checks air quality every 15 minutes during party.
+  # Reminds to open windows if CO2 elevated.
+  # --------------------------------------------------
+  - id: air_quality_party_mode_co2_check
+    alias: "Air Quality - Party Mode CO2 Check"
+    trigger:
+      - platform: time_pattern
+        minutes: "/15"
+    condition:
+      - condition: state
+        entity_id: input_boolean.party_mode
+        state: "on"
+      - condition: numeric_state
+        entity_id: sensor.living_area_co2
+        above: 1200
+    action:
+      # Run another exhaust boost
+      - service: script.hvac_exhaust_boost
+
+      # Remind about windows
+      - service: notify.house_notices
+        data:
+          title: "🎉 Party Air Quality Check"
+          message: |
+            CO2: {{ states('sensor.living_area_co2') }} ppm
+            Time: {{ now().strftime('%I:%M %p') }}
+            
+            Consider opening windows/doors
+            HVAC boost cycling every 15 min
+
+  # --------------------------------------------------
+  # Party Mode — Deactivate Cleanup
+  #
+  # Turns off kitchen hood after party ends.
+  # Runs final exhaust boost.
+  # --------------------------------------------------
+  - id: air_quality_party_mode_deactivate
+    alias: "Air Quality - Party Mode Deactivate"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.party_mode
+        to: "off"
+        for: "00:30:00"
+    action:
+      # Turn off kitchen hood
+      - service: switch.turn_off
+        target:
+          entity_id: switch.vent_hood_reset
+
+      # Final exhaust boost
+      - service: script.hvac_exhaust_boost
+
+      # Notify
+      - service: notify.operational_log
+        data:
+          title: "🎉 Party Mode Ended"
+          message: |
+            Final air quality reading:
+            CO2: {{ states('sensor.living_area_co2') }} ppm
+            PM2.5: {{ states('sensor.living_area_pm25') }} μg/m³
+            
+            Kitchen hood turned off
+            Final exhaust boost running
+
+# ==================================================
+# Daily Statistics & Reporting
+# ==================================================
+
+  # --------------------------------------------------
+  # Daily Stats — Update Max Values
+  #
+  # Tracks daily maximum readings for summary report.
+  # Runs every 5 minutes.
+  # --------------------------------------------------
+  - id: air_quality_update_daily_max
+    alias: "Air Quality - Update Daily Max"
+    trigger:
+      - platform: time_pattern
+        minutes: "/5"
+    action:
+      # Living Area CO2
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ states('sensor.living_area_co2')|float(0) > states('input_number.living_area_co2_max_today')|float(0) }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.living_area_co2_max_today
+                data:
+                  value: "{{ states('sensor.living_area_co2')|float(0) }}"
+
+      # Living Area PM2.5
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ states('sensor.living_area_pm25')|float(0) > states('input_number.living_area_pm25_max_today')|float(0) }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.living_area_pm25_max_today
+                data:
+                  value: "{{ states('sensor.living_area_pm25')|float(0) }}"
+
+      # Master Bedroom CO2
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ states('sensor.master_bedroom_co2')|float(0) > states('input_number.master_bedroom_co2_max_today')|float(0) }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.master_bedroom_co2_max_today
+                data:
+                  value: "{{ states('sensor.master_bedroom_co2')|float(0) }}"
+
+      # Master Bedroom PM2.5
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ states('sensor.master_bedroom_pm25')|float(0) > states('input_number.master_bedroom_pm25_max_today')|float(0) }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.master_bedroom_pm25_max_today
+                data:
+                  value: "{{ states('sensor.master_bedroom_pm25')|float(0) }}"
+
+  # --------------------------------------------------
+  # Daily Summary Report
+  #
+  # Sends daily air quality summary at 11:55 PM.
+  # Includes max readings, filtration events/runtime, and trend comparison.
+  # NEW FORMAT: Split CO2 and PM2.5 onto separate lines with trend indicators.
+  # --------------------------------------------------
+  - id: air_quality_daily_summary
+    alias: "Air Quality - Daily Summary"
+    trigger:
+      - platform: time
+        at: "23:55:00"
+    action:
+      # Calculate variables for summary
+      - variables:
+          # Floor 1 values
+          floor1_co2: "{{ states('input_number.living_area_co2_max_today')|float(0) }}"
+          floor1_pm25: "{{ states('input_number.living_area_pm25_max_today')|float(0) }}"
+          floor1_co2_avg: "{{ states('input_number.living_area_co2_7day_avg')|float(0) }}"
+          floor1_pm25_avg: "{{ states('input_number.living_area_pm25_7day_avg')|float(0) }}"
+          
+          # Floor 2 values
+          floor2_co2: "{{ states('input_number.master_bedroom_co2_max_today')|float(0) }}"
+          floor2_pm25: "{{ states('input_number.master_bedroom_pm25_max_today')|float(0) }}"
+          floor2_co2_avg: "{{ states('input_number.master_bedroom_co2_7day_avg')|float(0) }}"
+          floor2_pm25_avg: "{{ states('input_number.master_bedroom_pm25_7day_avg')|float(0) }}"
+          
+          # Floor 1 emoji (worst of CO2 or PM2.5)
+          floor1_emoji: >
+            {% if floor1_co2 > 2000 or floor1_pm25 > 55 %}🔴
+            {% elif floor1_co2 > 1200 or floor1_pm25 > 35 %}🟡
+            {% else %}🟢{% endif %}
+          
+          # Floor 2 emoji (worst of CO2 or PM2.5)
+          floor2_emoji: >
+            {% if floor2_co2 > 2000 or floor2_pm25 > 55 %}🔴
+            {% elif floor2_co2 > 1200 or floor2_pm25 > 35 %}🟡
+            {% else %}🟢{% endif %}
+          
+          # Floor 1 CO2 trend
+          floor1_co2_diff: "{{ (floor1_co2 - floor1_co2_avg)|round(0) }}"
+          floor1_co2_trend: >
+            {% set diff = floor1_co2 - floor1_co2_avg %}
+            {% if diff > 100 %}↑ {{ diff|round(0) }} ppm vs avg
+            {% elif diff < -100 %}↓ {{ (diff|abs)|round(0) }} ppm vs avg
+            {% else %}→ stable{% endif %}
+          
+          # Floor 1 PM2.5 trend
+          floor1_pm25_diff: "{{ (floor1_pm25 - floor1_pm25_avg)|round(1) }}"
+          floor1_pm25_trend: >
+            {% set diff = floor1_pm25 - floor1_pm25_avg %}
+            {% if diff > 10 %}↑ worse
+            {% elif diff < -10 %}↓ better
+            {% else %}→ stable{% endif %}
+          
+          # Floor 2 CO2 trend
+          floor2_co2_diff: "{{ (floor2_co2 - floor2_co2_avg)|round(0) }}"
+          floor2_co2_trend: >
+            {% set diff = floor2_co2 - floor2_co2_avg %}
+            {% if diff > 100 %}↑ {{ diff|round(0) }} ppm vs avg
+            {% elif diff < -100 %}↓ {{ (diff|abs)|round(0) }} ppm vs avg
+            {% else %}→ stable{% endif %}
+          
+          # Floor 2 PM2.5 trend
+          floor2_pm25_diff: "{{ (floor2_pm25 - floor2_pm25_avg)|round(1) }}"
+          floor2_pm25_trend: >
+            {% set diff = floor2_pm25 - floor2_pm25_avg %}
+            {% if diff > 10 %}↑ worse
+            {% elif diff < -10 %}↓ better
+            {% else %}→ stable{% endif %}
+          
+          # Filtration stats
+          events_today: "{{ states('input_number.pm25_filter_events_today')|int(0) }}"
+          runtime_today: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) }}"
+          events_7day_avg: "{{ states('input_number.pm25_filter_events_7day_avg')|float(0) }}"
+          
+          # Event trend calculation
+          event_diff: "{{ events_today|int(0) - events_7day_avg|float(0) }}"
+          trend_text: >
+            {% if event_diff|float > 1.5 %}+{{ event_diff|round(0) }} events vs 7-day avg (worse)
+            {% elif event_diff|float < -1.5 %}{{ event_diff|round(0) }} events vs 7-day avg (better)
+            {% else %}Same as 7-day avg{% endif %}
+          
+          # Status message (bottom line)
+          status_msg: >
+            {% if floor1_emoji == '🔴' or floor2_emoji == '🔴' %}
+            ⚠️ Poor air quality. {% if floor1_co2 > 2000 %}Living area CO2 critical. {% endif %}{% if floor2_co2 > 2000 %}Bedroom CO2 critical. {% endif %}{% if floor1_pm25 > 55 or floor2_pm25 > 55 %}Check HVAC filter and ventilation.{% endif %}
+            {% elif floor1_emoji == '🟡' or floor2_emoji == '🟡' %}
+            {% if floor1_co2 > 1200 or floor2_co2 > 1200 %}CO2 elevated during occupied periods. {% endif %}{% if floor1_pm25 > 35 or floor2_pm25 > 35 %}PM2.5 spike from cooking/activity. {% endif %}
+            {% else %}
+            ✓ {% if floor2_co2 > 1000 and floor2_co2 <= 1200 %}Bedroom CO2 elevated overnight (normal). {% else %}Excellent air quality all day{% endif %}
+            {% endif %}
+
+      # Send summary notification
+      - service: notify.operational_log
+        data:
+          title: "📊 Daily Air Quality"
+          message: |
+            {{ floor1_emoji }} Floor 1 CO2: {{ floor1_co2|round(0) }} ppm max ({{ floor1_co2_trend }})
+                       PM2.5: {{ floor1_pm25|round(1) }} μg/m³ max ({{ floor1_pm25_trend }})
+            {{ floor2_emoji }} Floor 2 CO2: {{ floor2_co2|round(0) }} ppm max ({{ floor2_co2_trend }})
+                       PM2.5: {{ floor2_pm25|round(1) }} μg/m³ max ({{ floor2_pm25_trend }})
+            
+            PM2.5 filtration: {{ events_today }} events, {{ runtime_today }} min runtime
+            Trend: {{ trend_text }}
+            
+            {{ status_msg }}
+
+      # Update all 7-day rolling averages
+      # Formula: new_avg = (old_avg * 6 + today_value) / 7
+      
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filter_events_7day_avg
+        data:
+          value: "{{ ((events_7day_avg|float(0) * 6) + events_today|int(0)) / 7 }}"
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.living_area_co2_7day_avg
+        data:
+          value: "{{ ((floor1_co2_avg * 6) + floor1_co2) / 7 }}"
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.living_area_pm25_7day_avg
+        data:
+          value: "{{ ((floor1_pm25_avg * 6) + floor1_pm25) / 7 }}"
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bedroom_co2_7day_avg
+        data:
+          value: "{{ ((floor2_co2_avg * 6) + floor2_co2) / 7 }}"
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bedroom_pm25_7day_avg
+        data:
+          value: "{{ ((floor2_pm25_avg * 6) + floor2_pm25) / 7 }}"
+
+      # Reset daily counters
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.living_area_co2_max_today
+        data:
+          value: 0
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.living_area_pm25_max_today
+        data:
+          value: 0
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bedroom_co2_max_today
+        data:
+          value: 0
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bedroom_pm25_max_today
+        data:
+          value: 0
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filter_events_today
+        data:
+          value: 0
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pm25_filtration_runtime_today
+        data:
+          value: 0
+
+# ==================================================
+# Sensor Monitoring
+# ==================================================
+
+  # --------------------------------------------------
+  # Sensor Offline Detection
+  #
+  # Alerts if air quality sensors go offline.
+  # --------------------------------------------------
+  - id: air_quality_sensor_offline_alert
+    alias: "Air Quality - Sensor Offline Alert"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.living_area_co2
+          - sensor.living_area_pm25
+          - sensor.master_bedroom_co2
+          - sensor.master_bedroom_pm25
+        to: "unavailable"
+        for: "00:10:00"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "⚠️ Air Quality Sensor Offline"
+          message: |
+            Sensor: {{ trigger.to_state.attributes.friendly_name }}
+            Offline since: {{ now().strftime('%I:%M %p') }}
+            Duration: 10+ minutes
+            
+            Check sensor battery/connection
+            Air quality monitoring impaired
+
+  # --------------------------------------------------
+  # Sensor Recovery Notification
+  #
+  # Confirms when sensor comes back online.
+  # --------------------------------------------------
+  - id: air_quality_sensor_recovery
+    alias: "Air Quality - Sensor Recovery"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.living_area_co2
+          - sensor.living_area_pm25
+          - sensor.master_bedroom_co2
+          - sensor.master_bedroom_pm25
+        from: "unavailable"
+        for: "00:02:00"
+    action:
+      - service: notify.operational_log
+        data:
+          title: "✅ Air Quality Sensor Recovered"
+          message: |
+            Sensor: {{ trigger.to_state.attributes.friendly_name }}
+            Status: Online
+            Current reading: {{ trigger.to_state.state }} {{ trigger.to_state.attributes.unit_of_measurement }}

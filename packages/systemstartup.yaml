@@ -1,0 +1,69 @@
+###############################################################################
+# SYSTEM STARTUP AUTOMATION
+###############################################################################
+#
+# PURPOSE:
+# Sends notification on Home Assistant restart and refreshes status helpers
+# that don't persist across restarts.
+#
+# NOTIFICATION:
+# - Sent to house_alerts with restart timestamp
+#
+# STATUS REFRESH:
+# - Battery status (checks all battery levels)
+# - Smoke/CO online status (checks detector connectivity)
+# - Smoke/CO alert status (checks for active alerts)
+# - Integration statuses reset to Online (offline automations re-fire if needed)
+#
+###############################################################################
+
+automation:
+  - id: system_startup_notification
+    alias: "System - Startup Notification & Status Refresh"
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      # Send restart notification
+      - service: notify.house_alerts
+        data:
+          title: "Home Assistant Restarted"
+          message: "System restarted at {{ now().strftime('%I:%M %p on %B %d, %Y') }}"
+
+      # Wait 30 seconds for integrations to initialize
+      - delay: "00:00:30"
+
+      # Refresh script-based status helpers
+      - service: script.update_battery_status
+      - service: script.update_smoke_co_online_status
+      - service: script.update_smoke_co_alert_status
+
+      # Reset integration status helpers to Online on restart.
+      # Integrations re-initialize after startup; the offline detection
+      # automations in systemhealth.yaml will fire again if any integration
+      # fails to come back online.
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.insteon_status
+        data:
+          value: "Online"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.yolink_status
+        data:
+          value: "Online"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ecobee_status
+        data:
+          value: "Online"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ring_status
+        data:
+          value: "Online"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.integrations_status
+        data:
+          value: "Normal"

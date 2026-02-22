@@ -1,0 +1,71 @@
+###############################################################################
+# HVAC SCRIPTS
+###############################################################################
+#
+# Scripts for controlling HVAC fan operation, coordinated with air quality
+# monitoring and ventilation automations.
+#
+###############################################################################
+
+# ==================================================
+# HVAC Exhaust Boost
+# ==================================================
+#
+# PURPOSE:
+# 20-minute HVAC fan boost for exhaust ventilation. Used after bathroom
+# humidity cycles and laundry drying to clear residual moisture and heat.
+#
+# UPDATED FOR AIR QUALITY:
+# Now checks for active PM2.5 filtration before returning fan to AUTO.
+# If PM2.5 filtration is running, skips the AUTO return to allow air
+# quality filtration to continue uninterrupted.
+#
+# CALLED BY:
+# - masterbathhumidity.yaml (after bathroom fan cycle)
+# - middlebathhumidity.yaml (after bathroom fan cycle)
+# - eastbathhumidity.yaml (after bathroom fan cycle)
+# - laundry.yaml (after dryer cooldown)
+# - airquality.yaml (CO2 ventilation, party mode) -- highest priority, wins
+#
+# PRIORITY: airquality.yaml takes precedence via PM2.5 filtration check.
+# mode: restart means the last caller resets the 20-minute timer.
+#
+# MODE: restart
+# Allows the script to restart if called again while already running,
+# resetting the 20-minute timer.
+#
+# DEVICE_ID NOTE:
+# Uses device_id instead of entity_id for climate fan mode control.
+# The HomeKit Device integration (Ecobee) does not expose a fan control
+# entity - it is only accessible via the device itself. This is the only
+# way fan mode can be set from HA. Do not change to entity_id.
+#
+# ==================================================
+
+hvac_exhaust_boost:
+  alias: "HVAC – Exhaust Boost (20 min)"
+  mode: restart
+  sequence:
+    # Turn HVAC fan ON for exhaust ventilation
+    - service: climate.set_fan_mode
+      target:
+        device_id: c38113c2d02da790b689d4a3bdc4b5e1
+      data:
+        fan_mode: "on"
+
+    # Run for 20 minutes
+    - delay: "00:20:00"
+
+    # Check if PM2.5 filtration is currently active
+    # Only return to AUTO if air quality filtration is NOT running
+    # This prevents interference with PM2.5 air cleaning cycles
+    - condition: state
+      entity_id: input_boolean.pm25_filtration_active
+      state: "off"
+
+    # Return fan to AUTO mode (only if PM2.5 filtration is inactive)
+    - service: climate.set_fan_mode
+      target:
+        device_id: c38113c2d02da790b689d4a3bdc4b5e1
+      data:
+        fan_mode: "auto"

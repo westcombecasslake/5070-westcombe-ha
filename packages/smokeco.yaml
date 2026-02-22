@@ -1,0 +1,522 @@
+# ==================================================
+# Smoke/CO Detection Package
+#
+# Monitors smoke and CO detectors for offline status and alerts
+# Provides helpers for Android Auto status display
+#
+# Changes from v1:
+#   - Deduplicated: offline trigger on CO entity only (1 per physical device)
+#   - Cooldown: per-detector notified flag prevents repeat notifications
+#     until detector recovers; flag auto-clears on device coming back online
+#   - YoLink suppression: no offline spam during cloud outage
+#     (condition: yolink_status == Online)
+#   - For: timer naturally cancels if YoLink recovers within 10 min,
+#     restoring devices before timer expires
+#   - Fixed title regex: case-insensitive strip of sensor type suffix
+#   - Daily 8 AM status summary to Operational Log; extra House Notice if any offline
+#
+# Changes from v2:
+#   - Emergency Response: single consolidated House Alert for smoke or CO;
+#     shuts down HVAC fan and all 4 bath fans on detection
+#   - All Clear Recovery: restores fans, sends House Notice when all clear
+#   - Smoke Detected / CO Detected automations now update status helper only;
+#     notifications fully consolidated into Emergency Response
+# ==================================================
+
+# --------------------------------------------------
+# Status Helpers (visible to all YAML files)
+# --------------------------------------------------
+input_text:
+  smoke_co_online_status:
+    name: "Smoke/CO Online Status"
+    initial: "✅ Normal"
+
+  smoke_co_alert_status:
+    name: "Smoke/CO Alert Status"
+    initial: "✅ Normal"
+
+# --------------------------------------------------
+# Per-Detector Notified Flags (cooldown / dedup)
+# Set ON when offline notification fires.
+# Cleared ON when detector comes back online.
+# Prevents repeat notifications during flapping.
+# --------------------------------------------------
+input_boolean:
+  smoke_co_notified_basement:
+    name: "Smoke/CO Notified - Basement"
+
+  smoke_co_notified_south_bedroom:
+    name: "Smoke/CO Notified - South Bedroom"
+
+  smoke_co_notified_den:
+    name: "Smoke/CO Notified - Den"
+
+  smoke_co_notified_dining_room:
+    name: "Smoke/CO Notified - Dining Room"
+
+  smoke_co_notified_garage:
+    name: "Smoke/CO Notified - Garage"
+
+  smoke_co_notified_master_bedroom:
+    name: "Smoke/CO Notified - Master Bedroom"
+
+  smoke_co_notified_office:
+    name: "Smoke/CO Notified - Office"
+
+  smoke_co_notified_east_bedroom:
+    name: "Smoke/CO Notified - East Bedroom"
+
+# --------------------------------------------------
+# Smoke/CO Monitoring Automations
+# --------------------------------------------------
+automation:
+  # --------------------------------------------------
+  # OFFLINE DETECTION
+  # Triggers on CO entity only (one per physical device)
+  # to avoid duplicate notifications from the paired smoke entity.
+  # Suppressed if YoLink cloud is already flagged offline.
+  # Suppressed if this detector was already notified (flap protection).
+  # The 10-min for: timer auto-cancels if YoLink recovers and
+  # devices return online before the timer expires.
+  # --------------------------------------------------
+  - alias: "Smoke/CO - Detector Offline"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_carbon_monoxide
+          - binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide
+          - binary_sensor.den_smoke_alarm_carbon_monoxide
+          - binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.garage_smoke_alarm_carbon_monoxide
+          - binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.office_smoke_alarm_carbon_monoxide
+          - binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide
+        to: "unavailable"
+        for: "00:10:00"
+    variables:
+      notified_boolean: >
+        {% set map = {
+          'binary_sensor.basement_smoke_co_carbon_monoxide':          'input_boolean.smoke_co_notified_basement',
+          'binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide':  'input_boolean.smoke_co_notified_south_bedroom',
+          'binary_sensor.den_smoke_alarm_carbon_monoxide':            'input_boolean.smoke_co_notified_den',
+          'binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide': 'input_boolean.smoke_co_notified_dining_room',
+          'binary_sensor.garage_smoke_alarm_carbon_monoxide':         'input_boolean.smoke_co_notified_garage',
+          'binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide': 'input_boolean.smoke_co_notified_master_bedroom',
+          'binary_sensor.office_smoke_alarm_carbon_monoxide':         'input_boolean.smoke_co_notified_office',
+          'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide':   'input_boolean.smoke_co_notified_east_bedroom'
+        } %}
+        {{ map.get(trigger.entity_id, '') }}
+      detector_name: >
+        {{ trigger.to_state.attributes.friendly_name
+           | regex_replace('(?i) (carbon monoxide|smoke)$', '') }}
+    condition:
+      # Skip if YoLink cloud is down — system health covers the outage
+      - condition: state
+        entity_id: input_text.yolink_status
+        state: "Online"
+      # Skip if already notified for this detector (flap protection)
+      - condition: template
+        value_template: "{{ states(notified_boolean) == 'off' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: "{{ notified_boolean }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.smoke_co_online_status
+        data:
+          value: "⚠️ Offline"
+      - service: notify.house_notices
+        data:
+          title: "{{ detector_name }}"
+          message: |
+            Status: Offline (10+ min)
+            Check detector and battery
+
+  # --------------------------------------------------
+  # ONLINE RECOVERY
+  # Triggers on CO entity only from unavailable.
+  # Clears the per-detector notified flag so a future
+  # genuine offline will notify again.
+  # --------------------------------------------------
+  - alias: "Smoke/CO - Detector Online"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_carbon_monoxide
+          - binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide
+          - binary_sensor.den_smoke_alarm_carbon_monoxide
+          - binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.garage_smoke_alarm_carbon_monoxide
+          - binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.office_smoke_alarm_carbon_monoxide
+          - binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide
+        from: "unavailable"
+        for: "00:02:00"
+    variables:
+      notified_boolean: >
+        {% set map = {
+          'binary_sensor.basement_smoke_co_carbon_monoxide':          'input_boolean.smoke_co_notified_basement',
+          'binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide':  'input_boolean.smoke_co_notified_south_bedroom',
+          'binary_sensor.den_smoke_alarm_carbon_monoxide':            'input_boolean.smoke_co_notified_den',
+          'binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide': 'input_boolean.smoke_co_notified_dining_room',
+          'binary_sensor.garage_smoke_alarm_carbon_monoxide':         'input_boolean.smoke_co_notified_garage',
+          'binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide': 'input_boolean.smoke_co_notified_master_bedroom',
+          'binary_sensor.office_smoke_alarm_carbon_monoxide':         'input_boolean.smoke_co_notified_office',
+          'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide':   'input_boolean.smoke_co_notified_east_bedroom'
+        } %}
+        {{ map.get(trigger.entity_id, '') }}
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: "{{ notified_boolean }}"
+      - service: script.update_smoke_co_online_status
+
+  # --------------------------------------------------
+  # SMOKE DETECTION — status update only
+  # Notification handled by Emergency Response automation
+  # --------------------------------------------------
+  - alias: "Smoke/CO - Smoke Detected"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_smoke
+          - binary_sensor.south_bedroom_smoke_alarm_smoke
+          - binary_sensor.den_smoke_alarm_smoke
+          - binary_sensor.dining_room_smoke_co_alarm_smoke
+          - binary_sensor.garage_smoke_alarm_smoke
+          - binary_sensor.master_bedroom_smoke_co_alarm_smoke
+          - binary_sensor.office_smoke_alarm_smoke
+          - binary_sensor.east_bedroom_smoke_alarm_smoke
+        to: "on"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.smoke_co_alert_status
+        data:
+          value: "🔥 Smoke Detected"
+
+  # --------------------------------------------------
+  # CO DETECTION — status update only
+  # Notification handled by Emergency Response automation
+  # --------------------------------------------------
+  - alias: "Smoke/CO - CO Detected"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_carbon_monoxide
+          - binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide
+          - binary_sensor.den_smoke_alarm_carbon_monoxide
+          - binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.garage_smoke_alarm_carbon_monoxide
+          - binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.office_smoke_alarm_carbon_monoxide
+          - binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide
+        to: "on"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.smoke_co_alert_status
+        data:
+          value: "☠️ CO Detected"
+
+  # --------------------------------------------------
+  # SMOKE / CO CLEARED — status update
+  # Full system recovery handled by All Clear Recovery automation
+  # --------------------------------------------------
+  - alias: "Smoke/CO - Smoke Cleared"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_smoke
+          - binary_sensor.south_bedroom_smoke_alarm_smoke
+          - binary_sensor.den_smoke_alarm_smoke
+          - binary_sensor.dining_room_smoke_co_alarm_smoke
+          - binary_sensor.garage_smoke_alarm_smoke
+          - binary_sensor.master_bedroom_smoke_co_alarm_smoke
+          - binary_sensor.office_smoke_alarm_smoke
+          - binary_sensor.east_bedroom_smoke_alarm_smoke
+        to: "off"
+        for: "00:02:00"
+    action:
+      - service: script.update_smoke_co_alert_status
+
+  - alias: "Smoke/CO - CO Cleared"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_carbon_monoxide
+          - binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide
+          - binary_sensor.den_smoke_alarm_carbon_monoxide
+          - binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.garage_smoke_alarm_carbon_monoxide
+          - binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.office_smoke_alarm_carbon_monoxide
+          - binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide
+        to: "off"
+        for: "00:02:00"
+    action:
+      - service: script.update_smoke_co_alert_status
+
+  # --------------------------------------------------
+  # SMOKE/CO EMERGENCY RESPONSE
+  # Single combined notification for any smoke or CO event.
+  # Also shuts down HVAC fan and all 4 bath exhaust fans to
+  # stop circulating smoke/CO through ducts and vents.
+  # --------------------------------------------------
+  - alias: "Smoke/CO - Emergency Response"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_smoke
+          - binary_sensor.south_bedroom_smoke_alarm_smoke
+          - binary_sensor.den_smoke_alarm_smoke
+          - binary_sensor.dining_room_smoke_co_alarm_smoke
+          - binary_sensor.garage_smoke_alarm_smoke
+          - binary_sensor.master_bedroom_smoke_co_alarm_smoke
+          - binary_sensor.office_smoke_alarm_smoke
+          - binary_sensor.east_bedroom_smoke_alarm_smoke
+          - binary_sensor.basement_smoke_co_carbon_monoxide
+          - binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide
+          - binary_sensor.den_smoke_alarm_carbon_monoxide
+          - binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.garage_smoke_alarm_carbon_monoxide
+          - binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.office_smoke_alarm_carbon_monoxide
+          - binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide
+        to: "on"
+    variables:
+      is_co: "{{ 'carbon_monoxide' in trigger.entity_id }}"
+      detector_location: >
+        {{ trigger.to_state.attributes.friendly_name
+           | regex_replace('(?i) (carbon monoxide|smoke)$', '') }}
+    action:
+      # Shut down HVAC fan — stops circulating smoke/CO through ducts
+      - service: climate.set_fan_mode
+        target:
+          entity_id: climate.ecobee
+        data:
+          fan_mode: "auto"
+      # Turn off all 4 bath exhaust fans
+      - service: light.turn_off
+        target:
+          entity_id:
+            - light.master_bath_fan
+            - light.entry_bath_fan
+      - service: fan.turn_off
+        target:
+          entity_id:
+            - fan.middle_bath_humidity
+            - fan.east_suite_bathroom_humidity
+      # Single House Alert — location, type, and action in one message
+      - service: notify.house_alerts
+        data:
+          title: >
+            {% if is_co %}☠️ CARBON MONOXIDE DETECTED{% else %}🔥 SMOKE DETECTED{% endif %}
+          message: |
+            Location: {{ detector_location }}
+            HVAC fan and all bath fans shut down
+            {% if is_co %}EVACUATE immediately{% else %}Check location immediately{% endif %}
+
+  # --------------------------------------------------
+  # SMOKE/CO ALL CLEAR — SYSTEM RECOVERY
+  # Fires when any sensor clears but conditions on ALL being clear.
+  # Returns bath fans to off (humidity automations resume control).
+  # HVAC already on auto — Ecobee resumes normally.
+  # Sends House Notice confirmation.
+  # --------------------------------------------------
+  - alias: "Smoke/CO - All Clear Recovery"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.basement_smoke_co_smoke
+          - binary_sensor.south_bedroom_smoke_alarm_smoke
+          - binary_sensor.den_smoke_alarm_smoke
+          - binary_sensor.dining_room_smoke_co_alarm_smoke
+          - binary_sensor.garage_smoke_alarm_smoke
+          - binary_sensor.master_bedroom_smoke_co_alarm_smoke
+          - binary_sensor.office_smoke_alarm_smoke
+          - binary_sensor.east_bedroom_smoke_alarm_smoke
+          - binary_sensor.basement_smoke_co_carbon_monoxide
+          - binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide
+          - binary_sensor.den_smoke_alarm_carbon_monoxide
+          - binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.garage_smoke_alarm_carbon_monoxide
+          - binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide
+          - binary_sensor.office_smoke_alarm_carbon_monoxide
+          - binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide
+        to: "off"
+        for: "00:02:00"
+    condition:
+      - condition: template
+        value_template: >
+          {% set all_sensors = [
+            'binary_sensor.basement_smoke_co_smoke',
+            'binary_sensor.south_bedroom_smoke_alarm_smoke',
+            'binary_sensor.den_smoke_alarm_smoke',
+            'binary_sensor.dining_room_smoke_co_alarm_smoke',
+            'binary_sensor.garage_smoke_alarm_smoke',
+            'binary_sensor.master_bedroom_smoke_co_alarm_smoke',
+            'binary_sensor.office_smoke_alarm_smoke',
+            'binary_sensor.east_bedroom_smoke_alarm_smoke',
+            'binary_sensor.basement_smoke_co_carbon_monoxide',
+            'binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide',
+            'binary_sensor.den_smoke_alarm_carbon_monoxide',
+            'binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide',
+            'binary_sensor.garage_smoke_alarm_carbon_monoxide',
+            'binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide',
+            'binary_sensor.office_smoke_alarm_carbon_monoxide',
+            'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide'
+          ] %}
+          {{ all_sensors | select('is_state', 'on') | list | count == 0 }}
+    action:
+      - service: script.update_smoke_co_alert_status
+      - service: light.turn_off
+        target:
+          entity_id:
+            - light.master_bath_fan
+            - light.entry_bath_fan
+      - service: fan.turn_off
+        target:
+          entity_id:
+            - fan.middle_bath_humidity
+            - fan.east_suite_bathroom_humidity
+      - service: notify.house_notices
+        data:
+          title: "✅ Smoke/CO All Clear"
+          message: |
+            All detectors cleared
+            HVAC and bath fans restored to normal operation
+            Verify area is safe before re-entry
+
+  # --------------------------------------------------
+  # DAILY STATUS SUMMARY — 8:00 AM
+  # Checks all 8 detectors (CO entity as proxy for device online state).
+  # Always sends to Operational Log (silent, reviewed in morning).
+  # If any detector is offline, also sends to House Notices.
+  # --------------------------------------------------
+  - alias: "Smoke/CO - Daily Status Summary"
+    trigger:
+      - platform: time
+        at: "08:00:00"
+    variables:
+      status_lines: >
+        {% set devices = [
+          ('Basement',       'binary_sensor.basement_smoke_co_carbon_monoxide'),
+          ('South Bedroom',  'binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide'),
+          ('Den',            'binary_sensor.den_smoke_alarm_carbon_monoxide'),
+          ('Dining Room',    'binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide'),
+          ('Garage',         'binary_sensor.garage_smoke_alarm_carbon_monoxide'),
+          ('Master Bedroom', 'binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide'),
+          ('Office',         'binary_sensor.office_smoke_alarm_carbon_monoxide'),
+          ('East Bedroom',   'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide')
+        ] %}
+        {% set ns = namespace(lines=[]) %}
+        {% for name, entity in devices %}
+          {% if states(entity) == 'unavailable' %}
+            {% set ns.lines = ns.lines + ['⚠️ ' + name + ': Offline'] %}
+          {% else %}
+            {% set ns.lines = ns.lines + ['✅ ' + name + ': Online'] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.lines | join('\n') }}
+      any_offline: >
+        {% set devices = [
+          'binary_sensor.basement_smoke_co_carbon_monoxide',
+          'binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide',
+          'binary_sensor.den_smoke_alarm_carbon_monoxide',
+          'binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide',
+          'binary_sensor.garage_smoke_alarm_carbon_monoxide',
+          'binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide',
+          'binary_sensor.office_smoke_alarm_carbon_monoxide',
+          'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide'
+        ] %}
+        {{ devices | select('is_state', 'unavailable') | list | count > 0 }}
+    action:
+      # Always log to Operational Log (silent)
+      - service: notify.operational_log
+        data:
+          title: "Smoke/CO Daily Status"
+          message: "{{ status_lines }}"
+      # Additionally alert to House Notices if anything is offline
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ any_offline }}"
+            sequence:
+              - service: notify.house_notices
+                data:
+                  title: "Smoke/CO - Detector(s) Offline"
+                  message: "{{ status_lines }}"
+
+# --------------------------------------------------
+# Helper Scripts
+# --------------------------------------------------
+script:
+  update_smoke_co_online_status:
+    alias: "Update Smoke/CO Online Status"
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.smoke_co_online_status
+        data:
+          value: >
+            {% set sensors = [
+              states('binary_sensor.basement_smoke_co_carbon_monoxide'),
+              states('binary_sensor.basement_smoke_co_smoke'),
+              states('binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.south_bedroom_smoke_alarm_smoke'),
+              states('binary_sensor.den_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.den_smoke_alarm_smoke'),
+              states('binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide'),
+              states('binary_sensor.dining_room_smoke_co_alarm_smoke'),
+              states('binary_sensor.garage_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.garage_smoke_alarm_smoke'),
+              states('binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide'),
+              states('binary_sensor.master_bedroom_smoke_co_alarm_smoke'),
+              states('binary_sensor.office_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.office_smoke_alarm_smoke'),
+              states('binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.east_bedroom_smoke_alarm_smoke')
+            ] %}
+            {% if 'unavailable' in sensors %}
+              ⚠️ Offline
+            {% else %}
+              ✅ Normal
+            {% endif %}
+
+  update_smoke_co_alert_status:
+    alias: "Update Smoke/CO Alert Status"
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.smoke_co_alert_status
+        data:
+          value: >
+            {% set smoke_sensors = [
+              states('binary_sensor.basement_smoke_co_smoke'),
+              states('binary_sensor.south_bedroom_smoke_alarm_smoke'),
+              states('binary_sensor.den_smoke_alarm_smoke'),
+              states('binary_sensor.dining_room_smoke_co_alarm_smoke'),
+              states('binary_sensor.garage_smoke_alarm_smoke'),
+              states('binary_sensor.master_bedroom_smoke_co_alarm_smoke'),
+              states('binary_sensor.office_smoke_alarm_smoke'),
+              states('binary_sensor.east_bedroom_smoke_alarm_smoke')
+            ] %}
+            {% set co_sensors = [
+              states('binary_sensor.basement_smoke_co_carbon_monoxide'),
+              states('binary_sensor.south_bedroom_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.den_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.dining_room_smoke_co_alarm_carbon_monoxide'),
+              states('binary_sensor.garage_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide'),
+              states('binary_sensor.office_smoke_alarm_carbon_monoxide'),
+              states('binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide')
+            ] %}
+            {% if 'on' in co_sensors %}
+              ☠️ CO Detected
+            {% elif 'on' in smoke_sensors %}
+              🔥 Smoke Detected
+            {% else %}
+              ✅ Normal
+            {% endif %}

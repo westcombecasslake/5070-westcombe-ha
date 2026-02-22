@@ -1,0 +1,370 @@
+# Environmental Control
+
+**Last Updated:** February 2026
+
+---
+
+## Overview
+
+The Environmental Control subsystem manages indoor humidity and air quality through automated control of humidification, dehumidification, and ventilation systems. These systems work together to maintain optimal comfort levels while maximizing energy efficiency through peak-hour avoidance and intelligent triggering based on actual conditions rather than fixed schedules.
+
+The subsystem prevents common household issues like mold growth, dry air discomfort, and excessive energy costs by responding to real-time sensor data and seasonal patterns.
+
+---
+
+## Humidifier Pad Monitoring
+
+### What It Does
+
+Tracks the performance of the whole-house humidifier pad over time by monitoring main floor humidity trends. Alerts when the pad is degrading or needs replacement based on 7-day and 14-day rolling averages that filter out short-term HVAC cycling patterns.
+
+**Rationale:** Humidifier pads degrade gradually, causing declining humidity levels. Early detection prevents discomfort and allows planned replacement rather than emergency response during winter heating season. Proper humidity levels also protect house construction materials, wood trim, and furniture from damage caused by dry air.
+
+### Hardware
+
+**Ecobee Thermostat:**
+- Location: Main floor dining room
+- Provides: Main floor humidity reading
+- Entity: `sensor.main_floor_current_humidity`
+
+**HVAC Humidifier:**
+- Type: Whole-house bypass humidifier
+- Control: Independent humidistat (not controlled by HA)
+- HA Role: Monitoring only
+
+### Key Entities
+
+**Sensors:**
+- `sensor.main_floor_current_humidity` - Current humidity from Ecobee
+
+**Helper Sensors (created by this package):**
+- `sensor.main_floor_humidity_7_day_average` - 7-day rolling average
+- `sensor.main_floor_humidity_14_day_average` - 14-day rolling average
+- `binary_sensor.main_humidity_declining` - Trend detector
+
+**User Controls:**
+- `input_number.humidifier_baseline` - Expected humidity with good pad (default: 44%)
+- `input_datetime.last_humidifier_pad_change` - Tracks pad replacement date
+
+### Automations
+
+**Low Humidity Critical Alert:**
+- `humidifier_pad_low_humidity_alert`
+- Trigger: 7-day average below 36% for 48+ hours
+- Action: HIGH priority alert
+- Message: "Main floor humidity critically low - humidifier pad likely needs replacement"
+
+**Below Baseline Warning:**
+- `humidifier_pad_below_baseline_warning`
+- Trigger: 7-day average falls 8%+ below baseline for 72+ hours
+- Action: NORMAL priority
+- Message: "Humidity below baseline - humidifier pad may be degrading"
+
+**Declining Trend Notice:**
+- `humidifier_pad_declining_trend_notice`
+- Trigger: Negative 7-day trend sustained 5+ days AND 7-day average below 40%
+- Action: LOW priority early warning via house_notices
+
+**Pad Change Detection:**
+- `humidifier_pad_change_detected`
+- Trigger: Humidity spike >50% sustained for 30+ minutes
+- Condition: HVAC must be in heat mode (prevents false triggers from summer humidity)
+- Action: Auto-updates `last_humidifier_pad_change` timestamp; resets baseline 24 hours later
+- Rationale: New pad causes immediate humidity jump - auto-resets tracking
+
+**YAML:** hvachumiditypad.yaml
+
+---
+
+## Basement Dehumidifier Control
+
+### What It Does
+
+Automatically controls basement dehumidifier outlet to maintain 45-50% humidity while avoiding weekday peak electricity hours (3-7 PM Mon-Fri). Saves approximately $120-192 annually by blocking operation during peak rate periods.
+
+**Rationale:** Basements require consistent humidity control to prevent mold and musty odors. The system uses setpoint control - it runs for best effort to dehumidify when humidity exceeds 50%, though it may not always maintain exactly 50% depending on conditions. The 5% hysteresis (45-50%) prevents excessive on/off cycling while the peak-hour avoidance provides significant cost savings without compromising humidity control since basement humidity changes slowly.
+
+### Hardware
+
+**YoLink Humidity Sensor:**
+- Location: Basement
+- Entity: `sensor.basement_humidity_sensor_humidity`
+
+**Insteon Smart Outlet:**
+- Entity: `switch.scheduled_power_save`
+- Controls: Dehumidifier AC power
+
+**Dehumidifier:**
+- Type: Standard portable unit
+- HA Role: On/off control only
+
+### Key Entities
+
+**Sensors:**
+- `sensor.basement_humidity_sensor_humidity` - Current basement humidity
+
+**Switches:**
+- `switch.scheduled_power_save` - Dehumidifier outlet power control
+
+### Automations
+
+**Turn On:**
+- `basement_dehumidifier_on`
+- Trigger: Humidity rises above 50%
+- Condition: Outside peak hours (Mon-Fri 3-7 PM blocked)
+- Action: Turn on outlet, send notification
+- Operates anytime on weekends
+
+**Turn Off:**
+- `basement_dehumidifier_off`
+- Trigger: Humidity falls below 45% OR peak hours start (3 PM Mon-Fri)
+- Action: Turn off outlet, send notification
+- Prevents operation during expensive peak rate periods
+
+**YAML:** basementdehumidifiercontrol.yaml
+
+---
+
+## Bathroom Humidity Control
+
+### What It Does
+
+Automatically detects showers by monitoring humidity rise patterns and runs the exhaust fan to remove moisture, followed by turning on the HVAC fan to further equalize humidity throughout the house. Uses relative humidity tracking (baseline vs. peak) to work correctly regardless of seasonal outdoor humidity levels. Includes confirmation lock to prevent baseline drift during detection delay. Includes manual timer for non-shower ventilation needs.
+
+**Rationale:** Prevents mold growth and moisture damage by removing shower humidity. Traditional fixed timers waste energy running fan when not needed, while humidity-based control responds only to actual moisture events. The relative rise method works year-round without seasonal adjustments. The confirmation lock ensures the baseline is captured from the initial humidity rise, not from later fluctuations during the detection delay period. After the exhaust fan completes its cycle, the HVAC fan is activated to help distribute and equalize humidity throughout the house.
+
+This pattern is deployed as separate YAML packages per bathroom, each with its own helpers and entities to allow fully independent monitoring and control.
+
+### How It Works
+
+**Detection Phase (polling every 30 seconds):**
+- Tracks current humidity and maintains a rolling peak value
+- When humidity rises above the peak by a threshold (8% below 50% baseline, 5% above 50%), enters confirmation
+- Confirmation lock freezes the peak value to prevent baseline drift
+- After 4-minute delay, re-checks that rise is sustained (filters out brief spikes like running hot water)
+- If confirmed, sets baseline to original peak and starts fan
+
+**Fan Running Phase:**
+- Minimum 15-minute runtime after detection
+- Continues monitoring; turns off when humidity drops to 25% of the peak rise above baseline
+- 2-hour safety timeout forces fan off if humidity never drops sufficiently
+- Safety timeout sends HIGH priority alert
+
+**Timeout Reset:**
+- If no humidity updates for 15+ minutes with fan off, resets all tracking values
+- Prevents stale baseline/peak from causing false triggers
+
+**Manual Timer:**
+- If fan is manually turned on (baseline is 0, meaning not automation-triggered), auto-off after 15 minutes
+- Independent of humidity-based control; useful for ventilation without showering
+
+**HVAC Coordination:**
+- When fan cycle completes (normal or timeout), calls `script.hvac_exhaust_boost`
+- Script runs HVAC fan for 20 minutes to distribute remaining humidity
+- Script uses `mode: restart` so overlapping calls from multiple bathrooms reset the timer (last bathroom to finish sets the full 20-minute window)
+
+### Bathroom Instances
+
+#### Master Bath
+
+**Hardware:**
+- YoLink Humidity Sensor: `sensor.master_bath_humidity`
+- Insteon Switch (exhaust fan): `light.master_bath_fan`
+
+**Helpers (auto-managed, typically no adjustment needed):**
+- `input_number.master_bath_humidity_baseline` - Starting humidity when shower begins
+- `input_number.master_bath_humidity_peak` - Highest humidity during shower
+- `input_number.master_bath_humidity_last_update` - Timestamp for stale detection
+- `input_number.master_bath_fan_loop_start` - 2-hour safety timeout tracking
+- `input_boolean.master_bath_confirmation_pending` - Confirmation lock state
+
+**Automations:**
+- `Master Bath Humidity - Shower Detection` — main polling loop
+- `Master Bath Humidity - Timeout` — stale value reset
+- `Master Bath Fan - Manual Timer` — 15-minute auto-off for manual use
+
+**YAML:** masterbathhumidity.yaml
+
+#### Middle Bath
+
+**Hardware:**
+- YoLink Humidity Sensor: `sensor.middle_bath_humidity`
+- Exhaust fan: `fan.middle_bath_humidity`
+
+**Helpers (auto-managed, typically no adjustment needed):**
+- `input_number.middle_bath_humidity_baseline` - Starting humidity when shower begins
+- `input_number.middle_bath_humidity_peak` - Highest humidity during shower
+- `input_number.middle_bath_humidity_last_update` - Timestamp for stale detection
+- `input_number.middle_bath_fan_loop_start` - 2-hour safety timeout tracking
+- `input_boolean.middle_bath_confirmation_pending` - Confirmation lock state
+
+**Automations:**
+- `Middle Bath Humidity - Shower Detection` — main polling loop
+- `Middle Bath Humidity - Timeout` — stale value reset
+- `Middle Bath Fan - Manual Timer` — 15-minute auto-off for manual use
+
+**YAML:** middlebathhumidity.yaml
+
+#### East Bath
+
+**Hardware:**
+- YoLink Humidity Sensor: `sensor.east_suite_bathroom`
+- Exhaust fan: `fan.east_suite_bathroom_humidity`
+
+**Helpers (auto-managed, typically no adjustment needed):**
+- `input_number.east_bath_humidity_baseline` - Starting humidity when shower begins
+- `input_number.east_bath_humidity_peak` - Highest humidity during shower
+- `input_number.east_bath_humidity_last_update` - Timestamp for stale detection
+- `input_number.east_bath_fan_loop_start` - 2-hour safety timeout tracking
+- `input_boolean.east_bath_confirmation_pending` - Confirmation lock state
+
+**Automations:**
+- `East Bath Humidity - Shower Detection` — main polling loop
+- `East Bath Humidity - Timeout` — stale value reset
+- `East Bath Fan - Manual Timer` — 15-minute auto-off for manual use
+
+**YAML:** eastbathhumidity.yaml
+
+#### Switch Technology Notes
+
+The master bath exhaust fan uses an Insteon switch (`light.master_bath_fan`). The middle bath and east bath exhaust fans use Matter/Thread switches. See: insteon-integration.md, matter-thread-integration.md
+
+---
+
+## Entry Fan Coordination
+
+### What It Does
+
+Automatically turns off the entry bathroom fan after a fixed period to prevent energy waste from forgotten manual activation.
+
+**Rationale:** Small bathroom without humidity sensor, so uses simple timer-based control rather than intelligent humidity detection.
+
+### Hardware
+
+**Insteon Switch:**
+- Entity: Check entryfan.yaml for entity name
+- Controls: Entry bathroom exhaust fan
+
+### Automations
+
+**Fan Auto-Off:**
+- `Entry Bath - Fan Auto-Off`
+- Trigger: Timer-based (check YAML for duration)
+- Action: Turns off fan to prevent waste
+
+**YAML:** entryfan.yaml
+
+---
+
+## User Controls
+
+**Access:** Settings → Helpers
+
+**Humidifier Monitoring:**
+- `input_number.humidifier_baseline` - Expected humidity with good pad (30-60%, default: 44%)
+- `input_datetime.last_humidifier_pad_change` - Track pad replacement date
+
+**Bathroom Humidity (Advanced - typically no adjustment needed):**
+
+All bathroom humidity helpers are auto-managed by their respective automations. Each bathroom has its own independent set:
+
+*Master Bath:*
+- `input_number.master_bath_humidity_baseline` - Auto-set by detection logic
+- `input_number.master_bath_humidity_peak` - Auto-set by detection logic
+- `input_boolean.master_bath_confirmation_pending` - Auto-managed confirmation lock state
+
+*Middle Bath:*
+- `input_number.middle_bath_humidity_baseline` - Auto-set by detection logic
+- `input_number.middle_bath_humidity_peak` - Auto-set by detection logic
+- `input_boolean.middle_bath_confirmation_pending` - Auto-managed confirmation lock state
+
+*East Bath:*
+- `input_number.east_bath_humidity_baseline` - Auto-set by detection logic
+- `input_number.east_bath_humidity_peak` - Auto-set by detection logic
+- `input_boolean.east_bath_confirmation_pending` - Auto-managed confirmation lock state
+
+---
+
+## Notifications
+
+**Pushover Operational Log** (`notify.operational_log`):
+- Basement dehumidifier on/off events
+- Priority: Low (informational)
+
+**Pushover House Notices** (`notify.house_notices`):
+- Humidifier declining trend early warnings
+- Humidifier below baseline warnings
+- Priority: Normal (awareness needed)
+
+**Pushover House Alerts** (`notify.house_alerts`):
+- Humidifier critically low (pad needs replacement)
+- Bathroom fan safety timeout (2-hour max exceeded) — identifies which bathroom in message
+- Priority: High (action required)
+
+---
+
+## Related Systems
+
+**HVAC Integration:**
+- Ecobee thermostat provides humidity sensors for humidifier monitoring
+- Bathroom fans coordinate with `script.hvac_exhaust_boost`
+- See: homekit-device-integration.md
+
+**YoLink Sensors:**
+- Basement humidity sensor (dehumidifier control)
+- Master bath humidity sensor (shower detection)
+- Middle bath humidity sensor (shower detection)
+- East bath humidity sensor (shower detection)
+- See: yolink-integration.md
+
+**Insteon Switches:**
+- Basement dehumidifier outlet: `switch.scheduled_power_save`
+- Master bath fan: `light.master_bath_fan`
+- See: insteon-integration.md
+
+**Matter/Thread Switches:**
+- Middle bath fan: `fan.middle_bath_humidity`
+- East bath fan: `fan.east_suite_bathroom_humidity`
+- See: matter-thread-integration.md
+
+---
+
+## Troubleshooting
+
+**Humidifier pad alerts but pad is new:**
+- Check `input_number.humidifier_baseline` - may need adjustment
+- Verify `input_datetime.last_humidifier_pad_change` is set correctly
+- Statistics sensors need 7 days to populate after first setup
+
+**Basement dehumidifier not running:**
+- Check current time - blocked Mon-Fri 3-7 PM
+- Verify `sensor.basement_humidity_sensor_humidity` is reporting correctly
+- Check `switch.scheduled_power_save` responds to manual control
+
+**Bathroom fan not triggering on shower** (applies to any bathroom instance):
+- Check that the humidity sensor is updating (e.g., `sensor.master_bath_humidity`, `sensor.middle_bath_humidity`, or `sensor.east_suite_bathroom`)
+- Verify humidity rise exceeds threshold (8% below 50%, 5% above 50%)
+- May need 4-minute rise to confirm actual shower vs. brief spike
+
+**Bathroom baseline captured at wrong time:**
+- Confirmation lock (e.g., `input_boolean.master_bath_confirmation_pending`) prevents this
+- If still occurring, check automation trace to verify confirmation lock is being set
+- Lock should freeze peak value during 4-minute confirmation delay
+
+**Fan won't turn off after shower:**
+- 2-hour safety timeout will force off
+- Check the `*_fan_loop_start` timestamp for the relevant bathroom
+- Manual off always works regardless of automation state
+
+---
+
+## YAML Packages
+
+- `/config/packages/hvachumiditypad.yaml`
+- `/config/packages/basementdehumidifiercontrol.yaml`
+- `/config/packages/masterbathhumidity.yaml`
+- `/config/packages/middlebathhumidity.yaml`
+- `/config/packages/eastbathhumidity.yaml`
+- `/config/packages/entryfan.yaml`
+
+---

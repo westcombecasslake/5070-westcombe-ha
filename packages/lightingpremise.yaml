@@ -1,0 +1,569 @@
+###############################################################################
+# PREMISE LIGHTING AUTOMATION SYSTEM
+###############################################################################
+#
+# PURPOSE:
+# Manages exterior premise lighting using native Insteon scenes with intelligent
+# photocell-based dusk/dawn automation, seasonal adjustment, motion detection,
+# and scheduled nighttime shutoff.
+#
+# KEY FEATURES:
+# * Seasonal photocell delay adjustments (accounts for varying dusk light levels)
+# * Daily photocell sensor reset (prevents analog sensor drift)
+# * Motion-activated front porch override during dark hours
+# * Weekend-aware nighttime shutoff (later on Fri/Sat)
+# * Random delays for security/natural appearance
+# * Backup shutoff automations for redundancy
+# * Photocell failure detection and backup activation
+# * Biannual maintenance reminders
+#
+# INSTEON SCENES:
+# * Group 21: Main premise lighting scene (all exterior lights)
+# * Group 29: Front porch override scene
+#
+# SEASONAL DELAY LOGIC:
+# The photocell triggers earlier in summer (more ambient light at dusk) and later
+# in winter (darker at dusk). Delays compensate so lights turn on at consistent
+# darkness level year-round.
+#
+# NOTIFICATIONS:
+# * Dusk triggered -> Pushover Operational Log
+# * Photocell failure -> Pushover House Alerts
+# * Maintenance reminder -> Pushover House Alerts (Feb 1 & Aug 1)
+#
+###############################################################################
+
+input_number:
+  ###############################################################################
+  # SEASONAL PHOTOCELL DELAY ADJUSTMENTS
+  #
+  # These inputs fine-tune when lights turn on after photocell triggers.
+  # Photocell triggers at different light levels depending on season.
+  # Delays ensure consistent "darkness threshold" for light activation.
+  #
+  # ADJUSTMENT GUIDE:
+  # * Lights turn on too LATE? -> DECREASE the delay value
+  # * Lights turn on too EARLY? -> INCREASE the delay value
+  #
+  # Access via: Settings -> Devices & Services -> Helpers
+  ###############################################################################
+
+  premise_summer_delay:
+    name: Premise Summer Delay (May-Jul)
+    min: 0
+    max: 45
+    step: 1
+    unit_of_measurement: "min"
+
+  premise_shoulder_delay:
+    name: Premise Shoulder Season Delay (Apr/Aug)
+    min: 0
+    max: 45
+    step: 1
+    unit_of_measurement: "min"
+
+  premise_spring_fall_delay:
+    name: Premise Spring/Fall Delay (Mar/Sep)
+    min: 0
+    max: 45
+    step: 1
+    unit_of_measurement: "min"
+
+  premise_winter_delay:
+    name: Premise Winter Delay (Oct-Feb)
+    min: 0
+    max: 45
+    step: 1
+    unit_of_measurement: "min"
+
+input_boolean:
+  ###############################################################################
+  # FRONT MOTION ARMED FLAG
+  #
+  # Controls whether front door motion can trigger premise lights.
+  # Set to TRUE by dusk-on (and dusk backup) automations.
+  # Set to FALSE by dawn-off automation.
+  #
+  # PURPOSE: Prevents motion from triggering lights during daytime darkness
+  # (storms, overcast sky) by gating on the actual dusk/dawn cycle rather
+  # than just the photocell state, which can trip at any time of day.
+  #
+  # This boolean resets itself automatically every dusk/dawn cycle.
+  ###############################################################################
+  front_motion_armed:
+    name: Front Motion Armed
+    icon: mdi:motion-sensor
+
+automation:
+  ###############################################################################
+  # AUTOMATION: Daily Photocell Sensor Reset
+  #
+  # Cycles the photocell module daily to clear analog sensor drift/confusion.
+  # Runs at 1:00 PM (midday when sensor should be off anyway).
+  #
+  # PURPOSE: Analog sensors can drift or get confused over time. Daily reset
+  # helps ensure reliable evening triggering.
+  ###############################################################################
+  - id: premise_dusk_sensor_daily_reset
+    alias: "Premise Lighting -- Daily Photocell Reset"
+    mode: single
+    trigger:
+      - platform: time
+        at: "13:00:00"
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.photocell_micro_module
+      - delay: "00:00:05"
+      - action: switch.turn_on
+        target:
+          entity_id: switch.photocell_micro_module
+      - delay: "00:00:05"
+      - action: switch.turn_off
+        target:
+          entity_id: switch.photocell_micro_module
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights - Dusk On
+  #
+  # Primary automation that turns on all premise lights at dusk based on
+  # photocell sensor with seasonal delay adjustment.
+  #
+  # TIME GUARD: Only runs between 3:45 PM and 7:30 PM to prevent false triggers
+  # from sensor glitches at other times.
+  #
+  # SEASONAL DELAY: Calculated based on current month to compensate for varying
+  # ambient light levels at photocell trigger time.
+  #
+  # NOTIFICATION: Pushover Operational Log AFTER lights activate (confirmation).
+  ###############################################################################
+  - id: premise_lights_dusk_on
+    alias: "Premise Lighting -- Dusk On"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: switch.photocell_micro_module
+        to: "on"
+    condition:
+      - condition: time
+        after: "15:45:00"
+        before: "19:30:00"
+    action:
+      # Apply seasonal delay before turning on lights
+      - delay:
+          minutes: >
+            {% set month = now().month %}
+            {% if month in [5, 6, 7] %}
+              {{ states('input_number.premise_summer_delay') | int }}
+            {% elif month in [4, 8] %}
+              {{ states('input_number.premise_shoulder_delay') | int }}
+            {% elif month in [3, 9] %}
+              {{ states('input_number.premise_spring_fall_delay') | int }}
+            {% else %}
+              {{ states('input_number.premise_winter_delay') | int }}
+            {% endif %}
+
+      # Double-send: Critical exterior lighting activation at dusk
+      # ensures property security and safety lighting reliability
+      - action: insteon.scene_on
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_on
+        data:
+          group: 21
+
+      # Send notification AFTER lights activate (confirmation)
+      - action: notify.operational_log
+        data:
+          title: "Premise Lights - Activated"
+          message: |
+            {% set month = now().month %}
+            {% if month in [5, 6, 7] %}
+              {% set season = 'Summer' %}
+              {% set wait_min = states('input_number.premise_summer_delay') | int %}
+            {% elif month in [4, 8] %}
+              {% set season = 'Shoulder' %}
+              {% set wait_min = states('input_number.premise_shoulder_delay') | int %}
+            {% elif month in [3, 9] %}
+              {% set season = 'Spring/Fall' %}
+              {% set wait_min = states('input_number.premise_spring_fall_delay') | int %}
+            {% else %}
+              {% set season = 'Winter' %}
+              {% set wait_min = states('input_number.premise_winter_delay') | int %}
+            {% endif %}
+            Season: {{ season }}
+            Delay: {{ wait_min }} min
+            Lights activated: {{ now().strftime('%I:%M %p') }}
+            Actual dusk: {{ as_timestamp(state_attr('sun.sun', 'next_dusk')) | timestamp_custom('%I:%M %p') }}
+
+      # Arm front motion: dusk has been confirmed, motion override now permitted
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.front_motion_armed
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights - Dusk Backup (Photocell Failure)
+  #
+  # Backup automation that turns on lights if photocell fails to trigger.
+  # Runs 15 minutes after sunset as a failsafe.
+  #
+  # CONDITIONS:
+  # * Photocell module is still OFF (should be ON by now if working)
+  # * Premise lights are still OFF (photocell automation didn't run)
+  # * Sun is below horizon (it's actually dark)
+  #
+  # NOTIFICATION: Escalated to House Alerts to indicate maintenance needed
+  ###############################################################################
+  - id: premise_lights_dusk_backup
+    alias: "Premise Lighting -- Dusk Backup (Photocell Failure)"
+    mode: single
+    trigger:
+      - platform: sun
+        event: sunset
+        offset: "+00:15:00"
+    condition:
+      # Photocell should be ON by now but isn't
+      - condition: state
+        entity_id: switch.photocell_micro_module
+        state: "off"
+      # Lights are still off
+      - condition: state
+        entity_id: light.front_porch_override
+        state: "off"
+      # It's actually dark (sun below horizon)
+      - condition: sun
+        after: sunset
+    action:
+      - action: notify.house_alerts
+        data:
+          title: "Premise Lights - Photocell Failure"
+          message: |
+            Backup triggered at {{ now().strftime('%I:%M %p') }}
+            Photocell sensor may need attention
+            Consider unplug/replug cycle
+      # Double-send: Failsafe exterior lighting activation
+      # compensates for photocell sensor failure
+      - action: insteon.scene_on
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_on
+        data:
+          group: 21
+
+      # Arm front motion: backup dusk confirmed, motion override now permitted
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.front_motion_armed
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights - Dawn Off
+  #
+  # Triggers when photocell detects dawn, turns off all premise lighting.
+  #
+  # TIME GUARD: Only runs within 1 hour before sunrise to prevent false triggers
+  # from sensor glitches during the day or evening.
+  #
+  # This sun-based condition is more reliable than a static time window since
+  # sunrise varies throughout the year.
+  ###############################################################################
+  - id: premise_lights_dawn_off
+    alias: "Premise Lighting -- Dawn Off"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: switch.photocell_micro_module
+        to: "off"
+    condition:
+      - condition: sun
+        after: sunrise
+        after_offset: "-01:00:00"
+    action:
+      # Double-send: Dawn shutoff for energy conservation
+      # ensures all exterior lights deactivate reliably
+      - action: insteon.scene_off
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 21
+
+      # Disarm front motion: dawn confirmed, block daytime motion triggers
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.front_motion_armed
+
+  ###############################################################################
+  # AUTOMATION: Front Porch Manual Override
+  #
+  # When front porch override light is manually turned on, it stays on for
+  # 3 hours then automatically turns off the override scene.
+  #
+  # MODE RESTART: If triggered again while timer is running, the 3-hour timer
+  # resets (ensures light stays on for full 3 hours from last activation).
+  ###############################################################################
+  - id: premise_front_porch_manual_override
+    alias: "Front Porch Manual Override"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: light.front_porch_override
+        to: "on"
+    action:
+      - delay:
+          hours: 3
+      # Double-send: Manual override shutoff after timer
+      # ensures automatic deactivation after extended use
+      - action: insteon.scene_off
+        data:
+          group: 29
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 29
+
+  ###############################################################################
+  # AUTOMATION: Front Porch Motion Timer
+  #
+  # When motion is detected at front door during dark hours, turns on premise
+  # lights for 8-14 minutes then turns them off.
+  #
+  # CONDITIONS:
+  # * front_motion_armed must be ON (set TRUE at dusk, FALSE at dawn)
+  #   Prevents daytime darkness (storms/overcast) from triggering lights
+  # * Entry closet light must be OFF (indicates we're away/exterior lighting needed)
+  #
+  # NOTIFICATION: Only sent once per motion session (when lights are currently off).
+  # Prevents duplicate notifications from Ring's redundant event pairs.
+  # A 2-second delay at action start lets mode:restart absorb the duplicate
+  # before the notification check runs.
+  #
+  # RANDOM DELAY: 8-14 minutes (adds natural variation for security)
+  #
+  # MODE RESTART: If motion detected again, timer resets to ensure lights stay
+  # on for full duration from last motion.
+  ###############################################################################
+  - id: premise_front_porch_motion_timer
+    alias: "Front Porch Motion -- Premise Lights (10-Minute Timer)"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: event.front_door_motion
+    condition:
+      # Armed boolean: only true between dusk-on and dawn-off
+      # Blocks daytime motion triggers caused by storms or overcast conditions
+      - condition: state
+        entity_id: input_boolean.front_motion_armed
+        state: "on"
+      - condition: state
+        entity_id: light.entry_closet_premise
+        state: "off"
+      # Block during photocell daily reset (1:00 PM) to prevent false trigger
+      - condition: not
+        conditions:
+          - condition: time
+            after: "12:58:00"
+            before: "13:01:00"
+    action:
+      # Short delay: absorbs Ring's duplicate event pair via mode:restart.
+      # Second event cancels first before reaching the notification check.
+      - delay: "00:00:02"
+
+      # Conditional notification: only send if lights are currently off
+      # (indicates new motion session, not continued motion)
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: light.front_porch_override
+                state: "off"
+            sequence:
+              - action: notify.house_alerts
+                data:
+                  title: "Front Motion at Night"
+                  message: "{{ now().strftime('%I:%M %p') }}"
+        default: []
+      
+      # Double-send: Motion-triggered security lighting at night
+      # ensures reliable activation when someone approaches
+      - action: insteon.scene_on
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_on
+        data:
+          group: 21
+      - delay:
+          minutes: "{{ 8 + range(0, 7) | random }}"
+      # Double-send: Security lighting auto-shutoff after timer
+      # ensures lights don't remain on indefinitely
+      - action: insteon.scene_off
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 21
+
+  ###############################################################################
+  # AUTOMATION: Photocell Maintenance Reminder
+  #
+  # Sends biannual reminder to unplug/replug photocell sensor for maintenance.
+  # Triggers on February 1st and August 1st at 10:00 AM.
+  #
+  # PURPOSE: Periodic power cycle helps prevent sensor drift and ensures
+  # reliable operation throughout the year.
+  ###############################################################################
+  - id: premise_photocell_maintenance_reminder
+    alias: "Premise Lighting -- Photocell Maintenance Reminder"
+    mode: single
+    trigger:
+      - platform: time
+        at: "10:00:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().month in [2, 8] and now().day == 1 }}"
+    action:
+      - action: notify.house_alerts
+        data:
+          title: "Photocell Maintenance Reminder"
+          message: |
+            Time for biannual photocell sensor maintenance
+            Action: Unplug and replug photocell micro module
+            Location: {{ now().strftime('%B') }} maintenance cycle
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights Night Off (Sun-Thu)
+  #
+  # Automatically turns off premise lights on weeknights (Sunday-Thursday) at
+  # approximately 9:50 PM with randomized delay for security/natural appearance.
+  #
+  # RANDOM DELAY: 0-12 minutes after 9:50 PM trigger (lights off 9:50-10:02 PM)
+  #
+  # UPDATED: Uses template condition for more robust weekday checking
+  # (Weekday numbers: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun)
+  ###############################################################################
+  - id: premise_lights_off_sun_thu
+    alias: "Premise Lighting -- Night Off (Sun-Thu)"
+    mode: single
+    trigger:
+      - platform: time
+        at: "21:50:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().weekday() in [6, 0, 1, 2, 3] }}"
+    action:
+      - delay:
+          minutes: "{{ range(0, 13) | random }}"
+      # Double-send: Scheduled weeknight shutoff for energy conservation
+      # prevents lights from running all night unnecessarily
+      - action: insteon.scene_off
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 21
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights Night Off (Fri-Sat)
+  #
+  # Automatically turns off premise lights on weekend nights (Friday-Saturday)
+  # at approximately 11:30 PM with randomized delay.
+  #
+  # LATER SHUTOFF: Weekends get later shutoff time than weeknights to account
+  # for different activity patterns.
+  #
+  # RANDOM DELAY: 0-12 minutes after 11:30 PM trigger (lights off 11:30-11:42 PM)
+  #
+  # UPDATED: Uses template condition for more robust weekday checking
+  # (Weekday numbers: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun)
+  ###############################################################################
+  - id: premise_lights_off_fri_sat
+    alias: "Premise Lighting -- Night Off (Fri-Sat)"
+    mode: single
+    trigger:
+      - platform: time
+        at: "23:30:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().weekday() in [4, 5] }}"
+    action:
+      - delay:
+          minutes: "{{ range(0, 13) | random }}"
+      # Double-send: Scheduled weekend shutoff for energy conservation
+      # with later timing for extended weekend activity
+      - action: insteon.scene_off
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 21
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights Backup Night Off (Sun-Thu)
+  #
+  # BACKUP/FAILSAFE automation that ensures lights turn off even if primary
+  # automation fails due to Home Assistant errors or Insteon scene collisions.
+  #
+  # Triggers at 10:15 PM (25 minutes after primary automation) on Sun-Thu nights.
+  #
+  # PURPOSE: Catches failures from:
+  # * Home Assistant condition evaluation errors
+  # * Insteon scene broadcast collisions (fire-and-forget has no validation)
+  # * Any other silent failures in the primary automation
+  ###############################################################################
+  - id: premise_lights_backup_off_sun_thu
+    alias: "Premise Lighting -- Backup Night Off (Sun-Thu)"
+    mode: single
+    trigger:
+      - platform: time
+        at: "22:15:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().weekday() in [6, 0, 1, 2, 3] }}"
+    action:
+      # Double-send: Backup/failsafe weeknight shutoff
+      # redundancy ensures lights don't run all night if primary automation fails
+      - action: insteon.scene_off
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 21
+
+  ###############################################################################
+  # AUTOMATION: Premise Lights Backup Night Off (Fri-Sat)
+  #
+  # BACKUP/FAILSAFE automation that ensures lights turn off even if primary
+  # automation fails due to Home Assistant errors or Insteon scene collisions.
+  #
+  # Triggers at midnight (30 minutes after primary automation) on Fri-Sat nights.
+  #
+  # PURPOSE: Catches failures from:
+  # * Home Assistant condition evaluation errors
+  # * Insteon scene broadcast collisions (fire-and-forget has no validation)
+  # * Any other silent failures in the primary automation
+  ###############################################################################
+  - id: premise_lights_backup_off_fri_sat
+    alias: "Premise Lighting -- Backup Night Off (Fri-Sat)"
+    mode: single
+    trigger:
+      - platform: time
+        at: "00:00:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().weekday() in [4, 5] }}"
+    action:
+      # Double-send: Backup/failsafe weekend shutoff
+      # redundancy ensures lights don't run all night if primary automation fails
+      - action: insteon.scene_off
+        data:
+          group: 21
+      - delay: "00:00:03"
+      - action: insteon.scene_off
+        data:
+          group: 21

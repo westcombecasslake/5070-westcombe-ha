@@ -1,0 +1,241 @@
+# ==================================================
+# System Health Monitoring
+#
+# Integration and hub offline alerts
+# Monitors multiple devices to detect system-wide failures
+# Provides helpers for Android Auto status display
+# ==================================================
+
+# --------------------------------------------------
+# Integration Status Helpers (Android Auto display)
+# Set by offline/recovery automations below.
+# Combined integrations_status reflects all four.
+# --------------------------------------------------
+input_text:
+  insteon_status:
+    name: "Insteon Status"
+    initial: "Online"
+
+  yolink_status:
+    name: "YoLink Status"
+    initial: "Online"
+
+  ecobee_status:
+    name: "Ecobee Status"
+    initial: "Online"
+
+  ring_status:
+    name: "Ring Status"
+    initial: "Online"
+
+  integrations_status:
+    name: "Integrations Status"
+    initial: "Normal"
+
+automation:
+
+  # --------------------------------------------------
+  # Insteon System - OFFLINE Detection
+  # --------------------------------------------------
+  - alias: "System Health - Insteon System Offline"
+    trigger:
+      - platform: state
+        entity_id:
+          - light.entry_bath_fan
+          - light.master_bath_fan
+        to: "unavailable"
+        for: "00:10:00"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.insteon_status
+        data:
+          value: "Offline"
+      - service: notify.house_alerts
+        data:
+          title: "Insteon Integration Offline"
+          message: |
+            Status: Offline (10+ minutes)
+            Action Required: Check PLM connection
+
+  # --------------------------------------------------
+  # Insteon System - ONLINE Recovery
+  # --------------------------------------------------
+  - alias: "System Health - Insteon System Online"
+    trigger:
+      - platform: state
+        entity_id:
+          - light.entry_bath_fan
+          - light.master_bath_fan
+        from: "unavailable"
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_text.insteon_status
+        state: "Offline"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.insteon_status
+        data:
+          value: "Online"
+
+  # --------------------------------------------------
+  # YoLink System - OFFLINE Detection
+  # --------------------------------------------------
+  - alias: "System Health - YoLink System Offline"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.basement_smoke_co_battery
+          - sensor.master_bath_temp_humidity_sensor_battery
+          - sensor.laundry_temp_humidity_sensor_battery
+        to: "unavailable"
+        for: "00:10:00"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.yolink_status
+        data:
+          value: "Offline"
+      - service: notify.house_alerts
+        data:
+          title: "YoLink Integration Offline"
+          message: |
+            Status: Offline (10+ minutes)
+            Action Required: Check hub connection
+
+  # --------------------------------------------------
+  # YoLink System - ONLINE Recovery
+  # --------------------------------------------------
+  - alias: "System Health - YoLink System Online"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.basement_smoke_co_battery
+          - sensor.master_bath_temp_humidity_sensor_battery
+          - sensor.laundry_temp_humidity_sensor_battery
+        from: "unavailable"
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_text.yolink_status
+        state: "Offline"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.yolink_status
+        data:
+          value: "Online"
+
+  # --------------------------------------------------
+  # Ecobee Thermostat - OFFLINE Detection
+  # --------------------------------------------------
+  - alias: "System Health - Ecobee Offline"
+    trigger:
+      - platform: state
+        entity_id: sensor.main_floor_current_temperature
+        to: "unavailable"
+        for: "00:10:00"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ecobee_status
+        data:
+          value: "Offline"
+      - service: notify.house_alerts
+        data:
+          title: "Ecobee Thermostat Offline"
+          message: |
+            Status: Offline (10+ minutes)
+            Action Required: Check WiFi connection
+
+  # --------------------------------------------------
+  # Ecobee Thermostat - ONLINE Recovery
+  # --------------------------------------------------
+  - alias: "System Health - Ecobee Online"
+    trigger:
+      - platform: state
+        entity_id: sensor.main_floor_current_temperature
+        from: "unavailable"
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_text.ecobee_status
+        state: "Offline"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ecobee_status
+        data:
+          value: "Online"
+
+  # --------------------------------------------------
+  # Ring Doorbell - OFFLINE Detection
+  # --------------------------------------------------
+  - alias: "System Health - Ring Doorbell Offline"
+    trigger:
+      - platform: state
+        entity_id: sensor.front_door_battery
+        to: "unavailable"
+        for: "00:15:00"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ring_status
+        data:
+          value: "Offline"
+      - service: notify.house_alerts
+        data:
+          title: "Ring Doorbell Offline"
+          message: |
+            Status: Offline (15+ minutes)
+            Action Required: Check WiFi/power
+
+  # --------------------------------------------------
+  # Ring Doorbell - ONLINE Recovery
+  # --------------------------------------------------
+  - alias: "System Health - Ring Doorbell Online"
+    trigger:
+      - platform: state
+        entity_id: sensor.front_door_battery
+        from: "unavailable"
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_text.ring_status
+        state: "Offline"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ring_status
+        data:
+          value: "Online"
+
+  # --------------------------------------------------
+  # Overall Integration Status
+  # Triggered whenever any individual status changes.
+  # Shows "Normal" when all four are Online, else "Problem".
+  # --------------------------------------------------
+  - alias: "System Health - Update Overall Integrations Status"
+    trigger:
+      - platform: state
+        entity_id:
+          - input_text.insteon_status
+          - input_text.yolink_status
+          - input_text.ecobee_status
+          - input_text.ring_status
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.integrations_status
+        data:
+          value: >
+            {% if is_state('input_text.insteon_status', 'Online') and
+                  is_state('input_text.yolink_status', 'Online') and
+                  is_state('input_text.ecobee_status', 'Online') and
+                  is_state('input_text.ring_status', 'Online') %}
+              Normal
+            {% else %}
+              Problem
+            {% endif %}

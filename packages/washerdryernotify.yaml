@@ -1,0 +1,118 @@
+###############################################################################
+# WASHER & DRYER COMPLETION NOTIFICATIONS
+###############################################################################
+#
+# PURPOSE:
+# Sends Pushover house notices when washer or dryer cycles complete
+#
+# HOW IT WORKS:
+# Each appliance has a "running" boolean that is set true when power exceeds
+# the running threshold. Completion notifications only fire if that boolean
+# is true, preventing false alerts from sensor idle-state oscillation near
+# the off threshold.
+#
+# POWER THRESHOLDS:
+# - Washer running: >10W | off: <5W
+# - Dryer running:  >200W | off: <2W
+#
+# NOTIFICATIONS:
+# - Sent to notify.house_notices (normal priority)
+# - Separate messages for washer and dryer with completion timestamps
+#
+# REQUIRED ENTITIES:
+# - sensor.washer_monitor_current_power
+# - sensor.dryer_monitor_current_power
+# - notify.house_notices (Pushover notification service)
+#
+# NOTE:
+# This package is independent of laundry.yaml dryer fan control.
+# The fan control and notifications operate separately.
+#
+###############################################################################
+
+# --------------------------------------------------
+# Running State Flags
+# --------------------------------------------------
+input_boolean:
+  washer_running:
+    name: "Washer Running"
+
+  dryer_running:
+    name: "Dryer Running"
+
+# --------------------------------------------------
+# Automations
+# --------------------------------------------------
+automation:
+
+  # --- Washer ON ---
+  - id: washer_running_set
+    alias: "Washer - Set Running Flag"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.washer_monitor_current_power
+        above: 10
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.washer_running
+
+  # --- Washer DONE ---
+  - id: washer_cycle_complete_notification
+    alias: "Washer - Cycle Complete Notification"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.washer_monitor_current_power
+        below: 5
+        for:
+          minutes: 2
+    condition:
+      - condition: state
+        entity_id: input_boolean.washer_running
+        state: "on"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "🧺 Washer Complete"
+          message: "Washer cycle finished at {{ now().strftime('%I:%M %p') }}"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.washer_running
+
+  # --- Dryer ON ---
+  - id: dryer_running_set
+    alias: "Dryer - Set Running Flag"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.dryer_monitor_current_power
+        above: 200
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.dryer_running
+
+  # --- Dryer DONE ---
+  - id: dryer_cycle_complete_notification
+    alias: "Dryer - Cycle Complete Notification"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.dryer_monitor_current_power
+        below: 2
+        for:
+          minutes: 2
+    condition:
+      - condition: state
+        entity_id: input_boolean.dryer_running
+        state: "on"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "👕 Dryer Complete"
+          message: "Dryer cycle finished at {{ now().strftime('%I:%M %p') }}"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.dryer_running

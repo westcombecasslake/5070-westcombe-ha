@@ -1,0 +1,177 @@
+###############################################################################
+# LAUNDRY DRYER FAN - SMART BASELINE PACKAGE
+###############################################################################
+# Place this file in: /config/packages/laundry.yaml
+#
+# OVERVIEW:
+# Automatically controls a laundry room exhaust fan based on dryer usage and
+# temperature monitoring. Uses adaptive baseline temperature tracking to
+# efficiently manage fan runtime.
+#
+# AUTOMATIONS:
+# 1. laundry_dryer_fan_control (Main)
+#    - Detects dryer ON (>200W) - Sets temperature baseline & turns fan ON
+#    - Detects dryer OFF (<2W) - Runs temp-based cooldown with 45-min timeout
+#    - Cooldown stops when temp drops to baseline+3F OR 45 minutes elapsed
+#    - Triggers HVAC exhaust boost script when fan turns off
+#
+# 2. laundry_baseline_timeout (Maintenance)
+#    - Resets temperature baseline to 0 after 4 hours of dryer inactivity
+#    - Runs every 30 minutes to check for stale baseline data
+#
+# REQUIRED ENTITIES (not in this package):
+# - sensor.dryer_monitor_current_power (power monitoring sensor)
+# - sensor.laundry_temperature (room temperature sensor)
+# - light.laundry_fan_timer (fan switch/relay)
+# - script.hvac_exhaust_boost (HVAC boost script in scripts.yaml)
+#
+# BASELINE LOGIC:
+# - Baseline updates when dryer turns ON if:
+#   - Current temp < stored baseline (room has cooled), OR
+#   - Baseline = 0 (uninitialized), OR
+#   - Dryer off for 4+ hours (14400 seconds)
+#
+# POST-DEPLOYMENT NOTE:
+# - Dryer finished notification fires when fan turns off, not when dryer
+#   cycle ends. Move notification to dryer power-drop event for accuracy.
+###############################################################################
+
+input_number:
+  laundry_temp_baseline:
+    name: Laundry Temperature Baseline
+    min: 0
+    max: 120
+    step: 0.1
+    mode: box
+
+  laundry_dryer_last_off:
+    name: Laundry Dryer Last Off Timestamp
+    min: 0
+    max: 9999999999
+    step: 1
+    mode: box
+
+automation:
+  - id: laundry_dryer_fan_control
+    alias: "Laundry - Dryer Fan Control (Standalone)"
+    mode: restart
+
+    trigger:
+      - id: dryer_on
+        platform: numeric_state
+        entity_id: sensor.dryer_monitor_current_power
+        above: 200
+
+      - id: dryer_off
+        platform: numeric_state
+        entity_id: sensor.dryer_monitor_current_power
+        below: 2
+
+    action:
+      - choose:
+          # --------------------------------------------------
+          # DRYER ON - Set baseline and turn fan ON
+          # --------------------------------------------------
+          - conditions:
+              - condition: trigger
+                id: dryer_on
+            sequence:
+              - variables:
+                  current_temp: "{{ states('sensor.laundry_temperature') | float(0) }}"
+                  stored_baseline: "{{ states('input_number.laundry_temp_baseline') | float(0) }}"
+                  last_off_time: "{{ states('input_number.laundry_dryer_last_off') | float(0) }}"
+                  time_since_off: "{{ as_timestamp(now()) - last_off_time }}"
+
+              # Update baseline ONLY if:
+              # 1. Current temp is lower than stored baseline (room cooled down), OR
+              # 2. Baseline is 0 (uninitialized), OR
+              # 3. Dryer has been off for 4+ hours (14400 seconds)
+              - if:
+                  - condition: template
+                    value_template: >
+                      {{ stored_baseline == 0 or 
+                         current_temp < stored_baseline or 
+                         time_since_off > 14400 }}
+                then:
+                  - service: input_number.set_value
+                    target:
+                      entity_id: input_number.laundry_temp_baseline
+                    data:
+                      value: "{{ current_temp }}"
+
+              - service: light.turn_on
+                target:
+                  entity_id: light.laundry_fan_timer
+
+          # --------------------------------------------------
+          # DRYER OFF - Temp-based cooldown with 45-min failsafe
+          # --------------------------------------------------
+          - conditions:
+              - condition: trigger
+                id: dryer_off
+            sequence:
+              # Update last off timestamp
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.laundry_dryer_last_off
+                data:
+                  value: "{{ as_timestamp(now()) }}"
+
+              # Create a 45-minute deadline
+              - variables:
+                  cooldown_deadline: "{{ as_timestamp(now()) + (45 * 60) }}"
+
+              # Repeat until temp drops to baseline + 3F OR deadline reached
+              - repeat:
+                  until:
+                    - condition: or
+                      conditions:
+                        # Condition A: Temp within 3F of baseline
+                        - condition: template
+                          value_template: >
+                            {% set current = states('sensor.laundry_temperature') | float(0) %}
+                            {% set baseline = states('input_number.laundry_temp_baseline') | float(0) %}
+                            {{ current <= (baseline + 3) }}
+
+                        # Condition B: 45-minute timeout
+                        - condition: template
+                          value_template: "{{ as_timestamp(now()) >= cooldown_deadline | float(0) }}"
+
+                  sequence:
+                    - delay: "00:02:00"
+
+              # Cooldown complete - turn fan OFF
+              - service: light.turn_off
+                target:
+                  entity_id: light.laundry_fan_timer
+
+              # Trigger HVAC exhaust boost
+              - service: script.hvac_exhaust_boost
+
+        default: []
+
+  # --------------------------------------------------
+  # TIMEOUT: Reset baseline after 4 hours of inactivity
+  # --------------------------------------------------
+  - id: laundry_baseline_timeout
+    alias: "Laundry - Reset Baseline After 4 Hours"
+    mode: single
+    
+    trigger:
+      - platform: time_pattern
+        minutes: "/30"
+    
+    condition:
+      - condition: template
+        value_template: >
+          {% set baseline = states('input_number.laundry_temp_baseline') | float(0) %}
+          {% set last_off = states('input_number.laundry_dryer_last_off') | float(0) %}
+          {% set age = as_timestamp(now()) - last_off %}
+          {{ baseline > 0 and age > 14400 }}
+    
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.laundry_temp_baseline
+        data:
+          value: 0

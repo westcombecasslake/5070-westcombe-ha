@@ -1,0 +1,370 @@
+###############################################################################
+# LIGHTING -- INDOOR PACKAGE
+###############################################################################
+#
+# PURPOSE:
+# This package manages automated lighting control for indoor spaces including
+# living room lamps, seasonal decorative lighting, and master bedroom lighting.
+# Features occupancy-aware shutoff, sunset-based triggering, manual control
+# overrides via helper toggles.
+#
+# AUTOMATIONS:
+#
+# 1. Living Room Lamps -- Fade Up Before Sunset (Scene 31)
+#    Gradually illuminates living room lamps 40 minutes before sunset
+#
+# 2. Living Room Lamps -- Night Off at 11:20 PM + Random Delay (Scene 24)
+#    Turns off living room lamps at 11:20 PM plus random 0-13 minute delay
+#    Waits for ecobee main floor occupancy sensor to clear before executing
+#    2-hour timeout prevents indefinite waiting
+#
+# 3. Living Room Lamps -- Morning Fade Off After Dawn (Scene 31)
+#    Turns off living room lamps 35 minutes after dusk sensor turns off
+#    Catches lamps that were manually turned on and left on overnight
+#    Uses Scene 31 OFF to slowly fade lamps off instead of abrupt shutoff
+#
+# 4. Living Room Lamps -- Away Mode Weekday Morning (Scene 24)
+#    Random activation 5:27-6:48 AM Monday-Friday when in away mode
+#    Simulates occupancy for security when house is unoccupied
+#
+# 5. Living Room Lamps -- Away Mode Weekend Morning (Scene 24)
+#    Random activation 7:13-7:58 AM Saturday-Sunday when in away mode
+#    Simulates occupancy for security when house is unoccupied
+#
+# 6. Master Bedroom -- Away Mode Evening Simulation (Scene 30)
+#    Random activation 9:22-9:34 PM daily when in away mode
+#    Lights on for 17-26 minutes to simulate evening bedroom activity
+#    Automatically turns off after duration for security appearance
+#
+# 7. Seasonal Lighting -- Turn ON When Helper Enabled (Scene 23)
+#    Immediately activates seasonal lighting when helper toggle is turned on
+#    Provides manual override control
+#
+# 8. Seasonal Lighting -- Turn OFF When Helper Disabled (Scene 23)
+#    Immediately deactivates seasonal lighting when helper toggle is turned off
+#    Cleanup and stop command when manually disabled
+#
+# 9. Seasonal Lighting -- Daily ON at 6 AM (Scene 23)
+#    Scheduled activation of seasonal lighting each morning
+#    Only runs when helper toggle is enabled
+#
+# 10. Seasonal Lighting -- Daily OFF at 11:55 PM (Scene 23, Occupancy Aware)
+#     Scheduled deactivation of seasonal lighting at night
+#     Only runs when helper is enabled and main floor is unoccupied
+#     Retries every 31 minutes until occupancy clears
+#
+# 11. Master Bedroom -- Lights Off When Unoccupied (Scene 30)
+#     Automatically turns off bedroom lights when room becomes unoccupied
+#     ON control handled externally (manual/motion)
+#
+# SCENES USED:
+# - Scene 23: Seasonal decorative lighting
+# - Scene 24: Living room lamps
+# - Scene 30: Master bedroom lighting
+# - Scene 31: Living room lamps 2.5 min fade up/down
+#
+# OCCUPANCY SENSORS:
+# - binary_sensor.main_floor_occupancy (ecobee thermostat - living room & seasonal)
+# - binary_sensor.master_bedroom_occupancy (bedroom)
+#
+# ECOBEE MODE:
+# - select.main_floor_current_mode (thermostat mode for away detection)
+#
+# DUSK SENSOR:
+# - switch.photocell_micro_module (indoor photocell for dawn/dusk detection)
+#
+###############################################################################
+
+input_boolean:
+  seasonal_lighting_enabled:
+    name: Seasonal Lighting Enabled
+    icon: mdi:string-lights
+
+automation:
+  #############################################################################
+  # LIVING ROOM LAMPS -- NON-SEASONAL (SCENE 31)
+  # Fade up 40 minutes before sunset
+  #############################################################################
+
+  - id: living_room_lamps_fade_up
+    alias: "Lighting -- Living Room Lamps -- Fade Up Before Sunset"
+    trigger:
+      - platform: sun
+        event: sunset
+        offset: "-00:40:00"
+    action:
+      # Double-send: Ensures sunset-triggered ambient lighting activation
+      # for gradual transition to evening lighting
+      - service: insteon.scene_on
+        data:
+          group: 31
+      - delay: "00:00:03"
+      - service: insteon.scene_on
+        data:
+          group: 31
+
+  #############################################################################
+  # LIVING ROOM LAMPS -- NIGHT OFF WITH RANDOM DELAY (SCENE 24)
+  # Off at 11:20 PM + random 0-13 minutes, waits for ecobee occupancy to clear
+  #############################################################################
+
+  - id: living_room_lamps_off_1120_random
+    alias: "Lighting -- Living Room Lamps -- Night Off (11:20 PM + Random)"
+    trigger:
+      - platform: time
+        at: "23:20:00"
+    action:
+      - delay:
+          minutes: "{{ range(0, 14) | random }}"
+      - wait_for_trigger:
+          - platform: state
+            entity_id: binary_sensor.main_floor_occupancy
+            to: "off"
+        timeout: "02:00:00"
+      # Double-send: Ensures nighttime shutoff despite occupancy check complexity
+      # preventing lights from being left on overnight
+      - service: insteon.scene_off
+        data:
+          group: 24
+      - delay: "00:00:03"
+      - service: insteon.scene_off
+        data:
+          group: 24
+
+
+  #############################################################################
+  # LIVING ROOM LAMPS -- MORNING OFF (SCENE 31)
+  # Fade off 35 minutes after dusk sensor turns off (daylight detected)
+  #############################################################################
+
+  - id: living_room_lamps_morning_fade_off
+    alias: "Lighting -- Living Room Lamps -- Morning Fade Off After Dawn"
+    trigger:
+      - platform: state
+        entity_id: switch.photocell_micro_module
+        to: "off"
+    action:
+      - delay: "00:35:00"
+      # Double-send: Ensures morning fade-off of lamps if manually left on
+      # gradually transitions from night to daylight without abrupt shutoff
+      - service: insteon.scene_off
+        data:
+          group: 31
+      - delay: "00:00:03"
+      - service: insteon.scene_off
+        data:
+          group: 31
+
+  #############################################################################
+  # LIVING ROOM LAMPS -- AWAY MODE MORNING ON (SCENE 24)
+  # Weekday: Random 5:27-6:48 AM, Weekend: Random 7:13-7:58 AM
+  # Simulates occupancy when house is in away mode
+  #############################################################################
+
+  - id: living_room_lamps_away_weekday
+    alias: "Lighting -- Living Room Lamps -- Away Mode Weekday Morning"
+    trigger:
+      - platform: time
+        at: "05:27:00"
+    condition:
+      - condition: state
+        entity_id: select.main_floor_current_mode
+        state: "away"
+      - condition: time
+        weekday:
+          - mon
+          - tue
+          - wed
+          - thu
+          - fri
+    action:
+      - delay:
+          minutes: "{{ range(0, 82) | random }}"
+      # Double-send: Ensures away mode simulation lamp activation
+      # instant ON for security appearance
+      - service: insteon.scene_on
+        data:
+          group: 24
+      - delay: "00:00:03"
+      - service: insteon.scene_on
+        data:
+          group: 24
+
+  - id: living_room_lamps_away_weekend
+    alias: "Lighting -- Living Room Lamps -- Away Mode Weekend Morning"
+    trigger:
+      - platform: time
+        at: "07:13:00"
+    condition:
+      - condition: state
+        entity_id: select.main_floor_current_mode
+        state: "away"
+      - condition: time
+        weekday:
+          - sat
+          - sun
+    action:
+      - delay:
+          minutes: "{{ range(0, 46) | random }}"
+      # Double-send: Ensures away mode simulation lamp activation
+      # instant ON for security appearance
+      - service: insteon.scene_on
+        data:
+          group: 24
+      - delay: "00:00:03"
+      - service: insteon.scene_on
+        data:
+          group: 24
+
+  #############################################################################
+  # MASTER BEDROOM -- AWAY MODE EVENING ON/OFF (SCENE 30)
+  # Random start 9:22-9:34 PM, on for 17-26 minutes
+  # Simulates evening bedroom activity when house is in away mode
+  #############################################################################
+
+  - id: master_bedroom_away_evening
+    alias: "Lighting -- Master Bedroom -- Away Mode Evening Simulation"
+    trigger:
+      - platform: time
+        at: "21:22:00"
+    condition:
+      - condition: state
+        entity_id: select.main_floor_current_mode
+        state: "away"
+    action:
+      - delay:
+          minutes: "{{ range(0, 13) | random }}"
+      # Double-send: Ensures away mode bedroom light activation
+      # for security appearance
+      - service: insteon.scene_on
+        data:
+          group: 30
+      - delay: "00:00:03"
+      - service: insteon.scene_on
+        data:
+          group: 30
+      # Wait for random duration to simulate bedroom use
+      - delay:
+          minutes: "{{ range(17, 27) | random }}"
+      # Double-send: Ensures automatic shutoff after simulated use
+      # completing evening activity pattern
+      - service: insteon.scene_off
+        data:
+          group: 30
+      - delay: "00:00:03"
+      - service: insteon.scene_off
+        data:
+          group: 30
+
+  #############################################################################
+  # SEASONAL LIGHTING -- HELPER STATE CHANGE CONTROL (SCENE 23)
+  # When helper turns ON -> send scene_on (manual control)
+  # When helper turns OFF -> send scene_off (cleanup & stop commands)
+  #############################################################################
+
+  - id: seasonal_lighting_helper_on
+    alias: "Lighting -- Seasonal -- Turn ON When Helper Enabled"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.seasonal_lighting_enabled
+        to: "on"
+    action:
+      # Double-send: Ensures manual toggle activation reliability
+      # for immediate decorative lighting control
+      - service: insteon.scene_on
+        data:
+          group: 23
+      - delay: "00:00:03"
+      - service: insteon.scene_on
+        data:
+          group: 23
+
+  - id: seasonal_lighting_helper_off
+    alias: "Lighting -- Seasonal -- Turn OFF When Helper Disabled"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.seasonal_lighting_enabled
+        to: "off"
+    action:
+      # Double-send: Ensures manual toggle deactivation reliability
+      # for immediate decorative lighting shutoff
+      - service: insteon.scene_off
+        data:
+          group: 23
+      - delay: "00:00:03"
+      - service: insteon.scene_off
+        data:
+          group: 23
+
+  #############################################################################
+  # SEASONAL LIGHTING -- SIMPLE SCHEDULE WITH OCCUPANCY CHECK (SCENE 23)
+  # ON at 6 AM, OFF at 11:55 PM, gated by helper, occupancy-aware OFF
+  #############################################################################
+
+  - id: seasonal_lighting_on_6am
+    alias: "Lighting -- Seasonal -- Daily ON at 6 AM"
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.seasonal_lighting_enabled
+        state: "on"
+    action:
+      # Double-send: Ensures scheduled morning activation reliability
+      # for daily decorative lighting automation
+      - service: insteon.scene_on
+        data:
+          group: 23
+      - delay: "00:00:03"
+      - service: insteon.scene_on
+        data:
+          group: 23
+
+  - id: seasonal_lighting_off_2355_with_occupancy
+    alias: "Lighting -- Seasonal -- Daily OFF at 11:55 PM (Occupancy Aware)"
+    trigger:
+      - platform: time
+        at: "23:55:00"
+      - platform: time_pattern
+        minutes: "/31"
+    condition:
+      - condition: state
+        entity_id: input_boolean.seasonal_lighting_enabled
+        state: "on"
+      - condition: time
+        after: "23:55:00"
+      - condition: state
+        entity_id: binary_sensor.main_floor_occupancy
+        state: "off"
+    action:
+      # Double-send: Ensures scheduled nighttime shutoff with occupancy awareness
+      # preventing decorative lights from being left on overnight
+      - service: insteon.scene_off
+        data:
+          group: 23
+      - delay: "00:00:03"
+      - service: insteon.scene_off
+        data:
+          group: 23
+
+  #############################################################################
+  # MASTER BEDROOM -- LIGHTS OFF WHEN BEDROOM UNOCCUPIED (SCENE 30)
+  #############################################################################
+
+  - id: master_bed_lights_off_unoccupied
+    alias: "Lighting -- Master Bedroom -- Lights Off When Unoccupied"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.master_bedroom_occupancy
+        to: "off"
+    action:
+      # Double-send: Occupancy-based shutoff needs high reliability
+      # to prevent lights staying on in empty room
+      - service: insteon.scene_off
+        data:
+          group: 30
+      - delay: "00:00:03"
+      - service: insteon.scene_off
+        data:
+          group: 30

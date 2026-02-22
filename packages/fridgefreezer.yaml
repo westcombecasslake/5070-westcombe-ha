@@ -1,0 +1,603 @@
+###############################################################################
+# FRIDGE & FREEZER MONITORING PACKAGE
+###############################################################################
+# Place this file in: /config/packages/fridgefreezer.yaml
+#
+# OVERVIEW:
+# Monitors all 4 fridge/freezer appliances for temperature failures using
+# data-driven thresholds calibrated from actual sensor history. Uses hybrid
+# approach: temperature + humidity to distinguish door-left-open from
+# compressor failures.
+#
+# MONITORED APPLIANCES:
+# 1. Kitchen Fridge (HVAC-controlled environment)
+# 2. Kitchen Freezer (HVAC-controlled environment)
+# 3. Garage Fridge (non-HVAC, seasonal temperature variations)
+# 4. Garage Freezer (non-HVAC, aggressive defrost cycles)
+#
+# ALERT LEVELS:
+# ⚠️  Warning (house_notices):
+#    - Temperature elevated but not critical
+#    - 20-30 minute delay to avoid grocery loading false positives
+#    - Non-urgent awareness notification
+#
+# 🚨 Critical (house_alerts):
+#    - Door Left Open: High temp + High humidity
+#    - Compressor Failure: High temp + Normal humidity
+#    - 10-15 minute delay for immediate action
+#    - Emergency priority notification
+#
+# ✅ Recovery (house_notices):
+#    - Temperature returned to normal
+#    - Informational notification with recovery time
+#
+# THRESHOLDS (calibrated from 2-day sensor history):
+#
+# Kitchen Fridge (runs cold, 20-36°F normal):
+#   Warning:  > 40°F for 30 min
+#   Critical: > 42°F + Humidity > 65% for 15 min (door)
+#   Critical: > 45°F for 15 min (compressor)
+#
+# Garage Fridge (very stable, 33-37°F normal):
+#   Warning:  > 40°F for 30 min
+#   Critical: > 42°F + Humidity > 45% for 15 min (door)
+#   Critical: > 45°F for 15 min (compressor)
+#
+# Kitchen Freezer (-5 to 5°F normal):
+#   Warning:  > 22°F for 20 min
+#   Critical: > 23°F + Humidity > 94% for 15 min (door)
+#   Critical: > 25°F for 10 min (compressor)
+#
+# Garage Freezer (-5 to 5°F normal, aggressive defrost to 28°F):
+#   Warning:  > 18°F for 25 min (allow for defrost)
+#   Critical: > 25°F + Humidity > 92% for 12 min (door)
+#   Critical: > 30°F for 12 min (compressor)
+#
+# REQUIRED ENTITIES (YoLink sensors, already configured):
+# - sensor.kitchen_fridge_temp_temperature
+# - sensor.kitchen_fridge_temp_humidity
+# - sensor.kitchen_freezer_temp_temperature
+# - sensor.kitchen_freezer_temp_humidity
+# - sensor.garage_fridge_temp_temperature
+# - sensor.garage_fridge_temp_humidity
+# - sensor.garage_freezer_temp_temperature
+# - sensor.garage_freezer_temp_humidity
+#
+# NOTIFICATION SERVICES (already configured):
+# - notify.house_notices (warnings & recovery)
+# - notify.house_alerts (critical issues)
+###############################################################################
+
+input_boolean:
+  kitchen_fridge_alert_active:
+    name: Kitchen Fridge Alert Active
+    initial: false
+
+  kitchen_freezer_alert_active:
+    name: Kitchen Freezer Alert Active
+    initial: false
+
+  garage_fridge_alert_active:
+    name: Garage Fridge Alert Active
+    initial: false
+
+  garage_freezer_alert_active:
+    name: Garage Freezer Alert Active
+    initial: false
+
+automation:
+  # ============================================================================
+  # KITCHEN FRIDGE MONITORING
+  # ============================================================================
+
+  # --------------------------------------------------
+  # Kitchen Fridge - Warning
+  # --------------------------------------------------
+  - id: kitchen_fridge_warning
+    alias: "Kitchen Fridge - Temperature Warning"
+    description: "Non-critical temperature elevation - possible issue developing"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_fridge_temp_temperature
+        above: 40
+        for:
+          minutes: 30
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_fridge_alert_active
+        state: "off"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "⚠️ Kitchen Fridge Temperature High"
+          message: |
+            Temperature: {{ states('sensor.kitchen_fridge_temp_temperature') }}°F (limit: 40°F)
+            Humidity: {{ states('sensor.kitchen_fridge_temp_humidity') }}%
+            Duration: 30+ minutes
+            
+            Check fridge - possible issue developing
+
+  # --------------------------------------------------
+  # Kitchen Fridge - Critical (Door Open)
+  # --------------------------------------------------
+  - id: kitchen_fridge_critical_door
+    alias: "Kitchen Fridge - Critical Door Open"
+    description: "High temp + high humidity = door left open"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_fridge_temp_temperature
+        above: 42
+        for:
+          minutes: 15
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.kitchen_fridge_temp_humidity
+        above: 65
+      - condition: state
+        entity_id: input_boolean.kitchen_fridge_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.kitchen_fridge_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Kitchen Fridge Door Open"
+          message: |
+            Temperature: {{ states('sensor.kitchen_fridge_temp_temperature') }}°F (critical: 42°F)
+            Humidity: {{ states('sensor.kitchen_fridge_temp_humidity') }}% (normal: ~30%)
+            Duration: 15+ minutes
+            
+            Likely cause: Door left open
+            ACTION REQUIRED: Close door immediately
+
+  # --------------------------------------------------
+  # Kitchen Fridge - Critical (Compressor Failure)
+  # --------------------------------------------------
+  - id: kitchen_fridge_critical_compressor
+    alias: "Kitchen Fridge - Critical Compressor Failure"
+    description: "Very high temp + normal humidity = compressor issue"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_fridge_temp_temperature
+        above: 45
+        for:
+          minutes: 15
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_fridge_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.kitchen_fridge_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Kitchen Fridge Compressor Failure"
+          message: |
+            Temperature: {{ states('sensor.kitchen_fridge_temp_temperature') }}°F (critical: 45°F)
+            Humidity: {{ states('sensor.kitchen_fridge_temp_humidity') }}% (normal range)
+            Duration: 15+ minutes
+            
+            Likely cause: Compressor failure
+            ACTION REQUIRED: Check immediately - food safety risk
+
+  # --------------------------------------------------
+  # Kitchen Fridge - Recovery
+  # --------------------------------------------------
+  - id: kitchen_fridge_recovery
+    alias: "Kitchen Fridge - Temperature Recovery"
+    description: "Temperature returned to normal range"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_fridge_temp_temperature
+        below: 38
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_fridge_alert_active
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.kitchen_fridge_alert_active
+      - service: notify.house_notices
+        data:
+          title: "✅ Kitchen Fridge Temperature Normal"
+          message: |
+            Temperature: {{ states('sensor.kitchen_fridge_temp_temperature') }}°F
+            Humidity: {{ states('sensor.kitchen_fridge_temp_humidity') }}%
+            
+            Issue resolved - temperature recovered
+
+  # ============================================================================
+  # KITCHEN FREEZER MONITORING
+  # ============================================================================
+
+  # --------------------------------------------------
+  # Kitchen Freezer - Warning
+  # --------------------------------------------------
+  - id: kitchen_freezer_warning
+    alias: "Kitchen Freezer - Temperature Warning"
+    description: "Temperature above normal - check for issues"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_freezer_temp_temperature
+        above: 22
+        for:
+          minutes: 20
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_freezer_alert_active
+        state: "off"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "⚠️ Kitchen Freezer Temperature High"
+          message: |
+            Temperature: {{ states('sensor.kitchen_freezer_temp_temperature') }}°F (limit: 22°F)
+            Humidity: {{ states('sensor.kitchen_freezer_temp_humidity') }}%
+            Duration: 20+ minutes
+            
+            Check freezer - temperature elevated
+
+  # --------------------------------------------------
+  # Kitchen Freezer - Critical (Door Open)
+  # --------------------------------------------------
+  - id: kitchen_freezer_critical_door
+    alias: "Kitchen Freezer - Critical Door Open"
+    description: "High temp + very high humidity = door left open"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_freezer_temp_temperature
+        above: 23
+        for:
+          minutes: 15
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.kitchen_freezer_temp_humidity
+        above: 94
+      - condition: state
+        entity_id: input_boolean.kitchen_freezer_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.kitchen_freezer_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Kitchen Freezer Door Open"
+          message: |
+            Temperature: {{ states('sensor.kitchen_freezer_temp_temperature') }}°F (critical: 23°F)
+            Humidity: {{ states('sensor.kitchen_freezer_temp_humidity') }}% (normal: ~75%)
+            Duration: 15+ minutes
+            
+            Likely cause: Door left open
+            ACTION REQUIRED: Close door immediately
+
+  # --------------------------------------------------
+  # Kitchen Freezer - Critical (Compressor Failure)
+  # --------------------------------------------------
+  - id: kitchen_freezer_critical_compressor
+    alias: "Kitchen Freezer - Critical Compressor Failure"
+    description: "Very high temp = compressor failure"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_freezer_temp_temperature
+        above: 25
+        for:
+          minutes: 10
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_freezer_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.kitchen_freezer_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Kitchen Freezer Compressor Failure"
+          message: |
+            Temperature: {{ states('sensor.kitchen_freezer_temp_temperature') }}°F (critical: 25°F)
+            Humidity: {{ states('sensor.kitchen_freezer_temp_humidity') }}%
+            Duration: 10+ minutes
+            
+            Likely cause: Compressor failure
+            ACTION REQUIRED: Check immediately - food safety risk
+
+  # --------------------------------------------------
+  # Kitchen Freezer - Recovery
+  # --------------------------------------------------
+  - id: kitchen_freezer_recovery
+    alias: "Kitchen Freezer - Temperature Recovery"
+    description: "Temperature returned to normal range"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.kitchen_freezer_temp_temperature
+        below: 5
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_freezer_alert_active
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.kitchen_freezer_alert_active
+      - service: notify.house_notices
+        data:
+          title: "✅ Kitchen Freezer Temperature Normal"
+          message: |
+            Temperature: {{ states('sensor.kitchen_freezer_temp_temperature') }}°F
+            Humidity: {{ states('sensor.kitchen_freezer_temp_humidity') }}%
+            
+            Issue resolved - temperature recovered
+
+  # ============================================================================
+  # GARAGE FRIDGE MONITORING
+  # ============================================================================
+
+  # --------------------------------------------------
+  # Garage Fridge - Warning
+  # --------------------------------------------------
+  - id: garage_fridge_warning
+    alias: "Garage Fridge - Temperature Warning"
+    description: "Temperature elevated - monitor situation"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_fridge_temp_temperature
+        above: 40
+        for:
+          minutes: 30
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_fridge_alert_active
+        state: "off"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "⚠️ Garage Fridge Temperature High"
+          message: |
+            Temperature: {{ states('sensor.garage_fridge_temp_temperature') }}°F (limit: 40°F)
+            Humidity: {{ states('sensor.garage_fridge_temp_humidity') }}%
+            Duration: 30+ minutes
+            
+            Check fridge - temperature elevated
+
+  # --------------------------------------------------
+  # Garage Fridge - Critical (Door Open)
+  # --------------------------------------------------
+  - id: garage_fridge_critical_door
+    alias: "Garage Fridge - Critical Door Open"
+    description: "High temp + elevated humidity = door left open"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_fridge_temp_temperature
+        above: 42
+        for:
+          minutes: 15
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.garage_fridge_temp_humidity
+        above: 45
+      - condition: state
+        entity_id: input_boolean.garage_fridge_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.garage_fridge_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Garage Fridge Door Open"
+          message: |
+            Temperature: {{ states('sensor.garage_fridge_temp_temperature') }}°F (critical: 42°F)
+            Humidity: {{ states('sensor.garage_fridge_temp_humidity') }}% (normal: ~25%)
+            Duration: 15+ minutes
+            
+            Likely cause: Door left open
+            ACTION REQUIRED: Close door immediately
+
+  # --------------------------------------------------
+  # Garage Fridge - Critical (Compressor Failure)
+  # --------------------------------------------------
+  - id: garage_fridge_critical_compressor
+    alias: "Garage Fridge - Critical Compressor Failure"
+    description: "Very high temp = compressor failure"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_fridge_temp_temperature
+        above: 45
+        for:
+          minutes: 15
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_fridge_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.garage_fridge_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Garage Fridge Compressor Failure"
+          message: |
+            Temperature: {{ states('sensor.garage_fridge_temp_temperature') }}°F (critical: 45°F)
+            Humidity: {{ states('sensor.garage_fridge_temp_humidity') }}%
+            Duration: 15+ minutes
+            
+            Likely cause: Compressor failure
+            ACTION REQUIRED: Check immediately - food safety risk
+
+  # --------------------------------------------------
+  # Garage Fridge - Recovery
+  # --------------------------------------------------
+  - id: garage_fridge_recovery
+    alias: "Garage Fridge - Temperature Recovery"
+    description: "Temperature returned to normal range"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_fridge_temp_temperature
+        below: 38
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_fridge_alert_active
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.garage_fridge_alert_active
+      - service: notify.house_notices
+        data:
+          title: "✅ Garage Fridge Temperature Normal"
+          message: |
+            Temperature: {{ states('sensor.garage_fridge_temp_temperature') }}°F
+            Humidity: {{ states('sensor.garage_fridge_temp_humidity') }}%
+            
+            Issue resolved - temperature recovered
+
+  # ============================================================================
+  # GARAGE FREEZER MONITORING
+  # ============================================================================
+
+  # --------------------------------------------------
+  # Garage Freezer - Warning
+  # --------------------------------------------------
+  - id: garage_freezer_warning
+    alias: "Garage Freezer - Temperature Warning"
+    description: "Temperature elevated beyond normal defrost cycle"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_freezer_temp_temperature
+        above: 18
+        for:
+          minutes: 25
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_freezer_alert_active
+        state: "off"
+    action:
+      - service: notify.house_notices
+        data:
+          title: "⚠️ Garage Freezer Temperature High"
+          message: |
+            Temperature: {{ states('sensor.garage_freezer_temp_temperature') }}°F (limit: 18°F)
+            Humidity: {{ states('sensor.garage_freezer_temp_humidity') }}%
+            Duration: 25+ minutes
+            
+            Check freezer - extended warm period
+
+  # --------------------------------------------------
+  # Garage Freezer - Critical (Door Open)
+  # --------------------------------------------------
+  - id: garage_freezer_critical_door
+    alias: "Garage Freezer - Critical Door Open"
+    description: "High temp + very high humidity = door left open"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_freezer_temp_temperature
+        above: 25
+        for:
+          minutes: 12
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.garage_freezer_temp_humidity
+        above: 92
+      - condition: state
+        entity_id: input_boolean.garage_freezer_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.garage_freezer_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Garage Freezer Door Open"
+          message: |
+            Temperature: {{ states('sensor.garage_freezer_temp_temperature') }}°F (critical: 25°F)
+            Humidity: {{ states('sensor.garage_freezer_temp_humidity') }}% (normal: ~75%)
+            Duration: 12+ minutes
+            
+            Likely cause: Door left open
+            ACTION REQUIRED: Close door immediately
+
+  # --------------------------------------------------
+  # Garage Freezer - Critical (Compressor Failure)
+  # --------------------------------------------------
+  - id: garage_freezer_critical_compressor
+    alias: "Garage Freezer - Critical Compressor Failure"
+    description: "Very high temp beyond defrost cycle = compressor failure"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_freezer_temp_temperature
+        above: 30
+        for:
+          minutes: 12
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_freezer_alert_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.garage_freezer_alert_active
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Garage Freezer Compressor Failure"
+          message: |
+            Temperature: {{ states('sensor.garage_freezer_temp_temperature') }}°F (critical: 30°F)
+            Humidity: {{ states('sensor.garage_freezer_temp_humidity') }}%
+            Duration: 12+ minutes
+            
+            Likely cause: Compressor failure
+            ACTION REQUIRED: Check immediately - food safety risk
+
+  # --------------------------------------------------
+  # Garage Freezer - Recovery
+  # --------------------------------------------------
+  - id: garage_freezer_recovery
+    alias: "Garage Freezer - Temperature Recovery"
+    description: "Temperature returned to normal range"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.garage_freezer_temp_temperature
+        below: 5
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_freezer_alert_active
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.garage_freezer_alert_active
+      - service: notify.house_notices
+        data:
+          title: "✅ Garage Freezer Temperature Normal"
+          message: |
+            Temperature: {{ states('sensor.garage_freezer_temp_temperature') }}°F
+            Humidity: {{ states('sensor.garage_freezer_temp_humidity') }}%
+            
+            Issue resolved - temperature recovered
