@@ -40,6 +40,7 @@ script:
         data:
           value: >
             {% set battery_sensors = [
+              states('sensor.back_yard_garage_battery'),
               states('sensor.front_door_battery'),
               states('sensor.basement_humidity_sensor_battery'),
               states('sensor.basement_smoke_co_battery'),
@@ -47,6 +48,7 @@ script:
               states('sensor.den_smoke_alarm_battery'),
               states('sensor.dining_room_smoke_co_alarm_battery'),
               states('sensor.fire_co_alarm_battery'),
+              states('sensor.garage_entry_door_battery'),
               states('sensor.garage_freezer_temp_battery'),
               states('sensor.garage_fridge_temp_battery'),
               states('sensor.garage_motion_sensor_battery'),
@@ -88,6 +90,7 @@ automation:
     trigger:
       - platform: numeric_state
         entity_id:
+          - sensor.back_yard_garage_battery
           - sensor.front_door_battery
           - sensor.basement_humidity_sensor_battery
           - sensor.basement_smoke_co_battery
@@ -95,6 +98,7 @@ automation:
           - sensor.den_smoke_alarm_battery
           - sensor.dining_room_smoke_co_alarm_battery
           - sensor.fire_co_alarm_battery
+          - sensor.garage_entry_door_battery
           - sensor.garage_freezer_temp_battery
           - sensor.garage_fridge_temp_battery
           - sensor.garage_motion_sensor_battery
@@ -139,6 +143,7 @@ automation:
     trigger:
       - platform: numeric_state
         entity_id:
+          - sensor.back_yard_garage_battery
           - sensor.front_door_battery
           - sensor.basement_humidity_sensor_battery
           - sensor.basement_smoke_co_battery
@@ -146,6 +151,7 @@ automation:
           - sensor.den_smoke_alarm_battery
           - sensor.dining_room_smoke_co_alarm_battery
           - sensor.fire_co_alarm_battery
+          - sensor.garage_entry_door_battery
           - sensor.garage_freezer_temp_battery
           - sensor.garage_fridge_temp_battery
           - sensor.garage_motion_sensor_battery

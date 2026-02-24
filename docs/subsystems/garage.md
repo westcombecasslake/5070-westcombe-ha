@@ -6,19 +6,19 @@
 
 ## Overview
 
-The Garage Systems subsystem provides motion-activated lighting for safety and convenience, plus freezing temperature monitoring to protect against pipe freeze damage. Both functions operate independently - lighting for daily usability and temperature alerts for property protection during cold weather.
+The Garage Systems subsystem provides motion- and door-activated lighting for safety and convenience, plus freezing temperature monitoring to protect against pipe freeze damage. Both functions operate independently - lighting for daily usability and temperature alerts for property protection during cold weather.
 
-Motion-activated lighting uses Insteon native scenes with Home Assistant enforcing timed shutoff, ensuring lights turn on immediately when motion is detected and automatically turn off after 10 minutes. Temperature monitoring sends repeating alerts if the garage remains at or below freezing for extended periods.
+Motion- and door-activated lighting uses Insteon native scenes with Home Assistant enforcing timed shutoff, ensuring lights turn on immediately when motion is detected or a door is opened, and automatically turn off after 10 minutes. Temperature monitoring sends repeating alerts if the garage remains at or below freezing for extended periods.
 
 ---
 
-## Motion-Activated Lighting
+## Motion/Door-Activated Lighting
 
 ### What It Does
 
-Automatically turns on all garage lights when motion is detected, using Insteon Scene 20 for immediate device-to-device response plus Home Assistant enforcement. Lights automatically turn off 10 minutes after the last motion detection.
+Automatically turns on all garage lights when motion is detected or a door is opened, using Insteon Scene 20 for immediate device-to-device response plus Home Assistant enforcement. Lights automatically turn off 10 minutes after the last triggering event.
 
-**Rationale:** Device-to-device Insteon scene triggering provides instant light response without waiting for Home Assistant to process. HA enforces the timed shutoff to prevent lights being left on indefinitely. Restart mode resets the timer on each new motion, keeping lights on during continuous activity while ensuring they turn off after the garage is vacant.
+**Rationale:** Device-to-device Insteon scene triggering provides instant light response without waiting for Home Assistant to process. HA enforces the timed shutoff to prevent lights being left on indefinitely. Restart mode resets the timer on each new trigger, keeping lights on during continuous activity while ensuring they turn off after the garage is vacant.
 
 ### Hardware
 
@@ -26,6 +26,11 @@ Automatically turns on all garage lights when motion is detected, using Insteon 
 - Location: Garage
 - Entity: `binary_sensor.garage_motion`
 - Detection: PIR motion sensor
+
+**YoLink Door Sensors:**
+- Back Yard Garage Door: `binary_sensor.back_yard_garage`
+- Garage Entry Door: `binary_sensor.entry_door_garage`
+- Detection: Open/close contact sensor
 
 **Garage Lights:**
 - Controlled via Insteon Scene 20
@@ -36,23 +41,27 @@ Automatically turns on all garage lights when motion is detected, using Insteon 
 
 **Sensors:**
 - `binary_sensor.garage_motion` - YoLink motion detector
+- `binary_sensor.back_yard_garage` - YoLink back yard garage door sensor
+- `binary_sensor.entry_door_garage` - YoLink garage entry door sensor
 
 **User Controls:**
 - None (fully automatic, but Scene 20 can be manually controlled)
 
 ### Automations
 
-**Garage Motion Lights via Insteon Scene:**
+**Garage Motion/Door Lights via Insteon Scene:**
 - ID: `garage_motion_lights`
-- `Garage - Motion Lights via Insteon Scene`
-- Trigger: Motion detected (`binary_sensor.garage_motion` = on)
-- Mode: Restart (resets timer on each new motion)
+- Alias: `Garage - Motion Lights via Insteon Scene`
+- Trigger: Motion detected OR any door opened (state = on)
+- Mode: Restart (resets timer on each new trigger)
 - Action Sequence:
   1. Activate Scene 20 (backup to device-to-device trigger)
-  2. Wait 10 minutes
-  3. Deactivate Scene 20 (first attempt)
-  4. Wait 3 seconds
-  5. Deactivate Scene 20 (backup attempt)
+  2. Wait 3 seconds
+  3. Activate Scene 20 (double-send for reliability)
+  4. Wait 10 minutes
+  5. Deactivate Scene 20 (first attempt)
+  6. Wait 3 seconds
+  7. Deactivate Scene 20 (backup attempt)
 - Rationale: 10-minute delay allows activity to complete, 3-second backup ensures lights actually turn off
 
 **YAML:** garage.yaml
@@ -63,7 +72,7 @@ Automatically turns on all garage lights when motion is detected, using Insteon 
 
 ### What It Does
 
-Monitors garage temperature and sends repeating alerts if temperature remains at or below 32°F (freezing) for 1+ hours. Alerts repeat every 2 hours while temperature stays below freezing to ensure continued awareness of potential pipe freeze risk.
+Monitors garage temperature and sends repeating alerts if temperature remains at or below 32F (freezing) for 1+ hours. Alerts repeat every 2 hours while temperature stays below freezing to ensure continued awareness of potential pipe freeze risk.
 
 **Rationale:** The garage contains materials that can be damaged by freezing, camper batteries on trickle charger that need monitoring, and is adjacent to the east suite bathroom with water pipes nearby. Prolonged freezing temperatures risk pipe damage and flooding. 1-hour confirmation period prevents false alerts from brief cold snaps. Repeating alerts ensure the condition isn't forgotten during extended cold periods. HIGH priority ensures alerts are noticed and acted upon.
 
@@ -86,8 +95,8 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 
 **Garage Below Freezing Alert:**
 - ID: `garage_below_freezing_alert`
-- `Garage - Below Freezing Alert`
-- Trigger: Temperature ≤ 32°F for 1+ hours
+- Alias: `Garage - Below Freezing Alert`
+- Trigger: Temperature <= 32F for 1+ hours
 - Repeat: Every 2 hours while below freezing
 - Action: Send HIGH priority alert
 - Notification: Pushover House Alerts
@@ -119,6 +128,7 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 
 **YoLink Sensors:**
 - Motion sensor for lighting automation
+- Door sensors for lighting automation
 - Temperature sensor for freeze alerts
 - See: yolink-integration.md
 
@@ -130,27 +140,27 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 
 ## Troubleshooting
 
-**Motion lights not turning on:**
-- Check `binary_sensor.garage_motion` is detecting motion
+**Motion/door lights not turning on:**
+- Check `binary_sensor.garage_motion`, `binary_sensor.back_yard_garage`, and `binary_sensor.entry_door_garage` are reporting correctly
 - Verify Scene 20 responds to manual activation
-- Check YoLink motion sensor has fresh batteries
+- Check YoLink sensors have fresh batteries
 - Ensure YoLink Hub is online
 
 **Lights not turning off after 10 minutes:**
-- Verify no continuous motion is being detected
+- Verify no continuous motion or door activity is being detected
 - Check if automation is enabled
 - Scene 20 can always be manually deactivated
 - Backup deactivation occurs 3 seconds after first attempt
 
 **Lights turn off too quickly:**
-- Each motion detection resets the 10-minute timer
-- If motion continues, lights should stay on
+- Each motion detection or door open resets the 10-minute timer
+- If motion or door activity continues, lights should stay on
 - Check motion sensor sensitivity in YoLink app
 - 10-minute delay is fixed (not user-adjustable without YAML edit)
 
 **Freezing alerts not received:**
 - Verify temperature sensor is reporting correctly
-- Check temperature must be ≤32°F for full hour before first alert
+- Check temperature must be <=32F for full hour before first alert
 - Confirm Pushover House Alerts service is functioning
 - Check entity name in garage.yaml matches actual sensor
 

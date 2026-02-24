@@ -4,12 +4,12 @@
 #
 # PURPOSE:
 # Two independent functions:
-# - Motion-activated lighting via Insteon Scene 20
+# - Motion/door-activated lighting via Insteon Scene 20
 # - Freezing temperature alerts using YoLink smoke/CO sensor thermometer
 #
-# MOTION LIGHTING:
-# - YoLink motion sensor triggers Scene 20 (double-send for reliability)
-# - Lights auto-off after 10 minutes; timer resets on each new motion
+# MOTION/DOOR LIGHTING:
+# - YoLink motion sensor or door sensors trigger Scene 20 (double-send for reliability)
+# - Lights auto-off after 10 minutes; timer resets on each new motion or door open
 #
 # FREEZE ALERT:
 # - Alerts if garage stays at or below 32F for 1+ hour
@@ -20,9 +20,9 @@
 
 automation:
   # --------------------------------------------------
-  # Garage Lights via Motion - Insteon Scene 20
+  # Garage Lights via Motion/Door - Insteon Scene 20
   #
-  # YoLink motion sensor triggers automation and resets timer.
+  # YoLink motion sensor or door sensors trigger automation and reset timer.
   # Home Assistant enforces delayed OFF with backup.
   # --------------------------------------------------
   - id: garage_motion_lights
@@ -30,7 +30,10 @@ automation:
     mode: restart
     trigger:
       - platform: state
-        entity_id: binary_sensor.garage_motion
+        entity_id:
+          - binary_sensor.garage_motion
+          - binary_sensor.back_yard_garage
+          - binary_sensor.entry_door_garage
         to: "on"
     action:
       # Double-send: Ensures reliable motion-activated lighting
@@ -57,32 +60,31 @@ automation:
   # --------------------------------------------------
   # Garage Below Freezing Alert (Repeating)
   #
-  # Sends an alert if the garage temperature remains
-  # at or below 32F for 1 hour, and repeats every
-  # 2 hours while still below freezing.
-  #
-  # NOTE: time_pattern fires at every even hour regardless
-  # of when freezing started - back-to-back alerts possible
-  # if freeze begins just before an even hour. Flagged for
-  # post-deployment improvement.
+  # Alerts if temperature stays at or below 32F for 1+ hour.
+  # Repeats every 2 hours while condition persists.
+  # Routes to House Alerts (high priority).
   # --------------------------------------------------
   - id: garage_below_freezing_alert
     alias: "Garage - Below Freezing Alert"
+    mode: single
     trigger:
-      # Initial alert after 1 hour below freezing
       - platform: numeric_state
         entity_id: sensor.garage_smoke_alarm_temperature
-        below: 32
-        for: "01:00:00"
-      # Repeat every 2 hours while still below freezing
-      - platform: time_pattern
-        hours: "/2"
-    condition:
-      - condition: numeric_state
-        entity_id: sensor.garage_smoke_alarm_temperature
-        below: 32
+        below: 33
+        for:
+          hours: 1
     action:
-      - service: notify.house_alerts
-        data:
-          title: "🥶 Garage Below Freezing"
-          message: "Garage temperature has been below freezing for 1+ hour"
+      - repeat:
+          while:
+            - condition: numeric_state
+              entity_id: sensor.garage_smoke_alarm_temperature
+              below: 33
+          sequence:
+            - service: notify.house_alerts
+              data:
+                title: "Garage Below Freezing"
+                message: |
+                  Garage temperature: {{ states('sensor.garage_smoke_alarm_temperature') }}F
+                  
+                  Risk of pipe freeze. Take action to warm garage or insulate pipes.
+            - delay: "02:00:00"

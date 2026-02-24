@@ -2,7 +2,7 @@
 
 ## Overview
 
-The battery monitoring system tracks all 23 battery-powered devices in the home automation system and sends tiered alerts based on battery levels. The system uses a two-tier notification strategy that separates early warnings from critical alerts.
+The battery monitoring system tracks all 25 battery-powered devices in the home automation system and sends tiered alerts based on battery levels. The system uses a two-tier notification strategy that separates early warnings from critical alerts.
 
 ---
 
@@ -28,46 +28,46 @@ The battery monitoring system tracks all 23 battery-powered devices in the home 
 ### Alert Routing Strategy
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    BATTERY MONITORING                        │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
++-------------------------------------------------------------+
+|                    BATTERY MONITORING                        |
++-------------------------------------------------------------+
+                            |
+                            v
                     Battery Level?
-                            │
-            ┌───────────────┼───────────────┐
-            │               │               │
-            ▼               ▼               ▼
+                            |
+            +---------------+---------------+
+            |               |               |
+            v               v               v
          > 30%          15-30%           < 15%
-            │               │               │
-            │               ▼               ▼
-            │      ┌─────────────────┐  ┌─────────────────┐
-            │      │ Battery Alerts  │  │  House Alerts   │
-            │      │   (Normal 0)    │  │   (High 1)      │
-            │      └─────────────────┘  └─────────────────┘
-            │               │               │
-            │               ▼               ▼
-            │      🔋 Low Battery      🔋 CRITICAL Battery
-            │      Order replacement   REPLACE IMMEDIATELY
-            │
-            ▼
+            |               |               |
+            |               v               v
+            |      +-----------------+  +-----------------+
+            |      | Battery Alerts  |  |  House Alerts   |
+            |      |   (Normal 0)    |  |   (High 1)      |
+            |      +-----------------+  +-----------------+
+            |               |               |
+            |               v               v
+            |      Low Battery Warning  CRITICAL Battery Alert
+            |      Order replacement   REPLACE IMMEDIATELY
+            |
+            v
         No Alert
 ```
 
 ### 30% Low Battery Warning
 
-**Service:** `notify.battery_alerts`  
-**Priority:** Normal (0)  
-**Trigger:** Battery drops below 30%  
-**Purpose:** Early warning to order replacement batteries  
+**Service:** `notify.battery_alerts`
+**Priority:** Normal (0)
+**Trigger:** Battery drops below 30%
+**Purpose:** Early warning to order replacement batteries
 **Time to Act:** Several weeks to months
 
 **Notification Example:**
 ```
-Title: 🔋 Low Battery Warning
+Title: Low Battery Warning
 Message: Device: Front Door
          Battery Level: 28%
-         
+
          Order replacement battery
 ```
 
@@ -79,18 +79,18 @@ Message: Device: Front Door
 
 ### 15% Critical Battery Alert
 
-**Service:** `notify.house_alerts` (SAME AS SMOKE/CO/SUMP FAILURES)  
-**Priority:** High (1)  
-**Trigger:** Battery drops below 15%  
-**Purpose:** Urgent warning - replace immediately  
+**Service:** `notify.house_alerts` (SAME AS SMOKE/CO/SUMP FAILURES)
+**Priority:** High (1)
+**Trigger:** Battery drops below 15%
+**Purpose:** Urgent warning - replace immediately
 **Time to Act:** Days to weeks
 
 **Notification Example:**
 ```
-Title: 🔋 CRITICAL Battery Alert
+Title: CRITICAL Battery Alert
 Message: Device: Front Door
          Battery Level: 12%
-         
+
          REPLACE IMMEDIATELY
 ```
 
@@ -106,24 +106,24 @@ A smoke detector at 12% battery is a safety issue that deserves the same urgency
 
 ### Battery Replacement Confirmation
 
-**Service:** `notify.battery_alerts`  
-**Trigger:** Battery goes above 50% after being below 40%  
+**Service:** `notify.battery_alerts`
+**Trigger:** Battery goes above 50% after being below 40%
 **Purpose:** Confirms successful battery replacement/recharge
 
 **Notification Example:**
 ```
-Title: ✅ Battery Replaced
+Title: Battery Replaced
 Message: Device: Front Door
          Battery Level: 87%
-         
+
          Battery replacement confirmed
 ```
 
 ---
 
-## Monitored Devices (23 Total)
+## Monitored Devices (25 Total)
 
-### Safety-Critical Devices (8)
+### Safety-Critical Devices (9)
 1. Basement Smoke/CO
 2. Dan Bedroom Smoke Alarm
 3. Den Smoke Alarm
@@ -134,47 +134,55 @@ Message: Device: Front Door
 8. Office Smoke Alarm
 9. Sarah Bedroom Smoke Alarm
 
-**Battery Type:** YoLink replaceable batteries (typically AA)  
-**Expected Life:** 5+ years  
+**Battery Type:** YoLink replaceable batteries (typically AA)
+**Expected Life:** 5+ years
 **Critical:** These devices provide life safety monitoring
 
-### Leak Detection Devices (4)
-10. Hot Water Heater Leak Sensor
-11. Sump Leak Sensor
-12. Well Leak Sensor
-13. Garage Motion Sensor (also monitors leaks)
+### Door Sensors (2)
+10. Back Yard Garage Door (`sensor.back_yard_garage_battery`)
+11. Garage Entry Door (`sensor.garage_entry_door_battery`)
 
-**Battery Type:** YoLink AA batteries  
-**Expected Life:** 2-3 years  
+**Battery Type:** YoLink AA batteries
+**Expected Life:** 2-3 years
+**Purpose:** Trigger garage lighting and provide open/close status
+
+### Leak Detection Devices (4)
+12. Hot Water Heater Leak Sensor
+13. Sump Leak Sensor
+14. Well Leak Sensor
+15. Garage Motion Sensor (also monitors leaks)
+
+**Battery Type:** YoLink AA batteries
+**Expected Life:** 2-3 years
 **Critical:** Early leak detection prevents major water damage
 
-### Environmental Monitoring (6)
-14. Basement Humidity Sensor
-15. Garage Freezer Temp
-16. Garage Fridge Temp
-17. Kitchen Freezer Temp
-18. Kitchen Fridge Temp
-19. Laundry Temp/Humidity
-20. Master Bath Temp/Humidity
+### Environmental Monitoring (7)
+16. Basement Humidity Sensor
+17. Garage Freezer Temp
+18. Garage Fridge Temp
+19. Kitchen Freezer Temp
+20. Kitchen Fridge Temp
+21. Laundry Temp/Humidity
+22. Master Bath Temp/Humidity
 
-**Battery Type:** YoLink AA batteries  
-**Expected Life:** 2-3 years  
+**Battery Type:** YoLink AA batteries
+**Expected Life:** 2-3 years
 **Purpose:** Monitor HVAC performance and appliance status
 
 ### Sump Pump System (2)
-21. Sump Pump Depth Alert
-22. Sump Pump Running Sensor
+23. Sump Pump Depth Alert
+24. Sump Pump Running Sensor
 
-**Battery Type:** YoLink AA batteries  
-**Expected Life:** 2-3 years  
+**Battery Type:** YoLink AA batteries
+**Expected Life:** 2-3 years
 **Critical:** Backup pump monitoring prevents basement flooding
 
 ### Access Control (1)
-23. Front Door (Ring 2 Doorbell)
+25. Front Door (Ring 2 Doorbell)
 
-**Battery Type:** Ring rechargeable battery pack  
-**Recharge Method:** Micro USB adapter  
-**Expected Life:** 6-12 months depending on activity/temperature  
+**Battery Type:** Ring rechargeable battery pack
+**Recharge Method:** Micro USB adapter
+**Expected Life:** 6-12 months depending on activity/temperature
 **Purpose:** Security, motion detection for premise lighting, video doorbell
 
 **Note on Ecobee Remote Sensor (Master Bedroom):**
@@ -194,7 +202,7 @@ ID: battery_low_30_percent
 Mode: parallel (multiple devices can alert simultaneously)
 Trigger: Battery < 30% for 5 minutes
 Condition: Battery > 15% (avoids duplicate with critical alert)
-Action: 
+Action:
   - Send notification to Battery Alerts
   - Update battery status helper
 ```
@@ -273,34 +281,34 @@ Provides at-a-glance battery system status for:
 
 **Test Battery Alerts (30% Warning):**
 ```
-Developer Tools → Services
+Developer Tools -> Services
 Service: notify.battery_alerts
 Data:
-  title: "🔋 Test: Low Battery Warning"
+  title: "Test: Low Battery Warning"
   message: "Testing 30% alert routing"
 ```
 
 **Test House Alerts (15% Critical):**
 ```
-Developer Tools → Services
+Developer Tools -> Services
 Service: notify.house_alerts
 Data:
-  title: "🔋 Test: CRITICAL Battery"
+  title: "Test: CRITICAL Battery"
   message: "Testing 15% alert routing - should be LOUD"
 ```
 
 ### Verification Checklist
-1. ✅ Check Pushover app - two separate buckets
-2. ✅ Confirm 30% test in **Battery Alerts** bucket
-3. ✅ Confirm 15% test in **House Alerts** bucket
-4. ✅ Verify House Alerts has loud/persistent sound
-5. ✅ Verify no quiet hours on House Alerts
+1. Check Pushover app - two separate buckets
+2. Confirm 30% test in **Battery Alerts** bucket
+3. Confirm 15% test in **House Alerts** bucket
+4. Verify House Alerts has loud/persistent sound
+5. Verify no quiet hours on House Alerts
 
 ### Automation Traces
 ```
-Developer Tools → Automations
+Developer Tools -> Automations
 Find: "Battery - 30% Low Warning"
-View Traces → Check last trigger details
+View Traces -> Check last trigger details
 ```
 
 ---
@@ -322,12 +330,13 @@ View Traces → Check last trigger details
 ### Battery Types Required
 
 **AA (YoLink Devices):**
-- Smoke/CO detectors (8x)
-- Temp/humidity sensors (6x)
+- Smoke/CO detectors (9x)
+- Temp/humidity sensors (7x)
 - Leak sensors (4x)
 - Sump pump sensors (2x)
 - Motion sensors (1x)
-- **Quantity to keep on hand:** 30-35 batteries
+- Door sensors (2x)
+- **Quantity to keep on hand:** 32-37 batteries
 
 **Ring Rechargeable:**
 - Front door doorbell (1x)
@@ -365,14 +374,14 @@ View Traces → Check last trigger details
 
 **Check Automation Status:**
 ```
-Settings → Automations
+Settings -> Automations
 Search: "Battery"
 Verify all 4 automations are enabled
 ```
 
 **Check Battery Sensor:**
 ```
-Developer Tools → States
+Developer Tools -> States
 Search: sensor.*_battery
 Verify sensor is reporting numeric value
 Check "unavailable" or "unknown" states
@@ -380,9 +389,9 @@ Check "unavailable" or "unknown" states
 
 **Check Pushover Integration:**
 ```
-Settings → Integrations → Pushover
+Settings -> Integrations -> Pushover
 Verify integration loaded successfully
-Test with Developer Tools → Services
+Test with Developer Tools -> Services
 ```
 
 ### False Alerts
@@ -419,7 +428,7 @@ Test with Developer Tools → Services
 
 ### Daily (Automatic)
 - Battery status helper updates at 8:00 AM
-- Monitors all 23 devices continuously
+- Monitors all 25 devices continuously
 
 ### Weekly (Manual)
 - Review Battery Alerts bucket for 30% warnings
@@ -492,16 +501,6 @@ Test with Developer Tools → Services
 - Review immediately
 - Cannot be silenced
 
-### Real-World Tested
-
-> "There's a number of them and it prompts me in alerts when I forget"
-
-This configuration was user-requested because:
-- Multiple critical batteries need immediate attention
-- House Alerts priority ensures action is taken
-- Separates "plan to replace" from "replace now"
-- Proven effective in actual use
-
 ---
 
 ## Related Documentation
@@ -519,39 +518,39 @@ This configuration was user-requested because:
 
 **Manual Battery Report:**
 ```
-Developer Tools → Services
+Developer Tools -> Services
 Service: script.battery_status_report
 ```
 
 **Update Battery Status:**
 ```
-Developer Tools → Services
+Developer Tools -> Services
 Service: script.update_battery_status
 ```
 
 **Check Current Status:**
 ```
-Developer Tools → States
+Developer Tools -> States
 Entity: input_text.battery_status
 ```
 
 ### File Locations
 
-**Package File:** `/config/packages/batteryalerts.yaml`  
-**Integration:** Settings → Integrations → Pushover  
-**Monitored Sensors:** 23 entities ending in `_battery`  
+**Package File:** `/config/packages/batteryalerts.yaml`
+**Integration:** Settings -> Integrations -> Pushover
+**Monitored Sensors:** 25 entities ending in `_battery`
 **Not Monitored:** Ecobee remote sensor (binary HomeKit reporting)
 
 ### Support
 
-**Pushover Issues:** Check Settings → Integrations → Pushover  
-**Battery Sensor Issues:** Check device-specific integrations (YoLink, Ring)  
-**Automation Issues:** Check Developer Tools → Automations → Traces
+**Pushover Issues:** Check Settings -> Integrations -> Pushover
+**Battery Sensor Issues:** Check device-specific integrations (YoLink, Ring)
+**Automation Issues:** Check Developer Tools -> Automations -> Traces
 
 ---
 
-**Document Status:** ✅ Current and Complete  
-**Last Updated:** February 10, 2026  
-**System Status:** Fully operational with 23 monitored devices  
-**Configuration:** Two-tier alerting (30% → Battery Alerts, 15% → House Alerts)  
+**Document Status:** Current and Complete
+**Last Updated:** February 2026
+**System Status:** Fully operational with 25 monitored devices
+**Configuration:** Two-tier alerting (30% -> Battery Alerts, 15% -> House Alerts)
 **Note:** Ecobee remote sensor (Master Bedroom) not monitored - replace CR2032 when sensor stops responding
