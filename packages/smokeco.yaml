@@ -79,7 +79,8 @@ automation:
   # The 10-min for: timer auto-cancels if YoLink recovers and
   # devices return online before the timer expires.
   # --------------------------------------------------
-  - alias: "Smoke/CO - Detector Offline"
+  - id: smoke_co_detector_offline
+    alias: "Smoke/CO - Detector Offline"
     trigger:
       - platform: state
         entity_id:
@@ -139,7 +140,8 @@ automation:
   # Clears the per-detector notified flag so a future
   # genuine offline will notify again.
   # --------------------------------------------------
-  - alias: "Smoke/CO - Detector Online"
+  - id: smoke_co_detector_online
+    alias: "Smoke/CO - Detector Online"
     trigger:
       - platform: state
         entity_id:
@@ -176,7 +178,8 @@ automation:
   # SMOKE DETECTION — status update only
   # Notification handled by Emergency Response automation
   # --------------------------------------------------
-  - alias: "Smoke/CO - Smoke Detected"
+  - id: smoke_co_smoke_detected
+    alias: "Smoke/CO - Smoke Detected"
     trigger:
       - platform: state
         entity_id:
@@ -200,7 +203,8 @@ automation:
   # CO DETECTION — status update only
   # Notification handled by Emergency Response automation
   # --------------------------------------------------
-  - alias: "Smoke/CO - CO Detected"
+  - id: smoke_co_co_detected
+    alias: "Smoke/CO - CO Detected"
     trigger:
       - platform: state
         entity_id:
@@ -224,7 +228,8 @@ automation:
   # SMOKE / CO CLEARED — status update
   # Full system recovery handled by All Clear Recovery automation
   # --------------------------------------------------
-  - alias: "Smoke/CO - Smoke Cleared"
+  - id: smoke_co_smoke_cleared
+    alias: "Smoke/CO - Smoke Cleared"
     trigger:
       - platform: state
         entity_id:
@@ -241,7 +246,8 @@ automation:
     action:
       - service: script.update_smoke_co_alert_status
 
-  - alias: "Smoke/CO - CO Cleared"
+  - id: smoke_co_co_cleared
+    alias: "Smoke/CO - CO Cleared"
     trigger:
       - platform: state
         entity_id:
@@ -264,7 +270,8 @@ automation:
   # Also shuts down HVAC fan and all 4 bath exhaust fans to
   # stop circulating smoke/CO through ducts and vents.
   # --------------------------------------------------
-  - alias: "Smoke/CO - Emergency Response"
+  - id: smoke_co_emergency_response
+    alias: "Smoke/CO - Emergency Response"
     trigger:
       - platform: state
         entity_id:
@@ -325,7 +332,8 @@ automation:
   # HVAC already on auto — Ecobee resumes normally.
   # Sends House Notice confirmation.
   # --------------------------------------------------
-  - alias: "Smoke/CO - All Clear Recovery"
+  - id: smoke_co_all_clear_recovery
+    alias: "Smoke/CO - All Clear Recovery"
     trigger:
       - platform: state
         entity_id:
@@ -395,7 +403,8 @@ automation:
   # Always sends to Operational Log (silent, reviewed in morning).
   # If any detector is offline, also sends to House Notices.
   # --------------------------------------------------
-  - alias: "Smoke/CO - Daily Status Summary"
+  - id: smoke_co_daily_status_summary
+    alias: "Smoke/CO - Daily Status Summary"
     trigger:
       - platform: time
         at: "08:00:00"

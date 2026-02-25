@@ -8,3 +8,4 @@ home-assistant_v2.db-wal
 home-assistant.log.fault
 .ha_run.lock
 productionbackup/
+.claudecode/
