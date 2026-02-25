@@ -275,11 +275,6 @@ Alert: Operational Log
 - Based on: Sump pit geometry (18" diameter × 8" drawdown)
 - Adjust if: Pit dimensions differ
 
-**`input_number.sump_pump_average_cycle_seconds`**
-- Default: 7.5 seconds
-- Determines: Runtime calculation accuracy
-- Tune by: Observing actual pump cycles
-
 **`input_number.sump_pump_monthly_gallons`**
 - Automatically maintained
 - Resets: First of each month at midnight

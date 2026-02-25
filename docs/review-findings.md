@@ -49,8 +49,8 @@ The safety-monitoring.md Battery Status section implies a daily summary but that
 
 **INFO — All automations have IDs. Clean.**
 
-**FLAG — Helper documented in safety-monitoring.md does not exist in YAML**
-The doc lists `input_number.sump_pump_average_cycle_seconds` as a user-adjustable helper. This helper is not defined anywhere in sumppump.yaml. Only `sump_pump_gallons_per_cycle` and `sump_pump_monthly_gallons` exist. Either the doc is outdated (helper was removed) or it was never built. Needs clarification.
+**RESOLVED — Helper documented in safety-monitoring.md does not exist in YAML**
+`input_number.sump_pump_average_cycle_seconds` confirmed no longer used. Removed from safety-monitoring.md.
 
 **INFO — Rainfall sensor reads current precipitation attribute, not 24h accumulation**
 `sensor.rainfall_24_hours` reads `state_attr('weather.forecast_home_2', 'precipitation')`. Depending on what Met.no returns in that attribute, this may be current precipitation rate rather than 24h accumulation. The automations use it to determine idle thresholds (>0.1", >0.5") — worth verifying the attribute returns the expected value. Low risk but worth confirming.
@@ -60,7 +60,7 @@ The doc lists `input_number.sump_pump_average_cycle_seconds` as a user-adjustabl
 ### safety-monitoring.md (doc)
 
 **FLAG — Battery alert threshold shows 15% only**
-The Battery Status section documents only a 15% threshold. Builddecisions rule 12 defines a two-level system (30% to battery_alerts, 15% to house_alerts). The doc is incomplete on this. Needs update when battery section is reviewed.
+The Battery Status section documents only a 15% threshold. Builddecisions rule 12 defines a two-level system (30% to battery_alerts, 15% to house_alerts). Update safety-monitoring.md battery section during battery subsystem review.
 
 **INFO — Notification examples outdated**
 Smoke/CO detection examples in the doc reflect v1 behavior. Current YAML sends a consolidated Emergency Response with HVAC/fan shutdown messaging. Minor doc drift.
@@ -73,7 +73,7 @@ Smoke/CO detection examples in the doc reflect v1 behavior. Current YAML sends a
 |------|--------|-------------|-------|
 | smokeco.yaml | Yes — IDs added | Partially | 1 open |
 | basementleaksensors.yaml | Yes | Yes | 0 |
-| sumppump.yaml | Yes | Partially | 1 |
+| sumppump.yaml | Yes | Updated | 0 open |
 | safety-monitoring.md | — | See above | 1 |
 
 **Priority discussion items:**
