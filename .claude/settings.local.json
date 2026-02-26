@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add docs/subsystems/safety-monitoring.md docs/review-findings.md && git commit -m \"$\\(cat <<'EOF'\nSafety subsystem review: resolve findings, update docs\n\n- safety-monitoring.md: removed unused sump_pump_average_cycle_seconds helper reference\n- review-findings.md: updated resolved items, open items carried forward\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin main)"
+    ]
+  }
+}
