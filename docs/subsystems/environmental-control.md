@@ -208,7 +208,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 #### East Bath
 
 **Hardware:**
-- YoLink Humidity Sensor: `sensor.east_suite_bathroom`
+- YoLink Humidity Sensor: `sensor.east_suite_bathroom_humidity`
 - Exhaust fan: `fan.east_suite_bathroom_humidity`
 
 **Helpers (auto-managed, typically no adjustment needed):**
@@ -242,14 +242,15 @@ Automatically turns off the entry bathroom fan after a fixed period to prevent e
 ### Hardware
 
 **Insteon Switch:**
-- Entity: Check entryfan.yaml for entity name
+- Entity: `light.entry_bath_fan`
 - Controls: Entry bathroom exhaust fan
 
 ### Automations
 
 **Fan Auto-Off:**
 - `Entry Bath - Fan Auto-Off`
-- Trigger: Timer-based (check YAML for duration)
+- Trigger: Fan turned on
+- Duration: 12 minutes, then auto-off
 - Action: Turns off fan to prevent waste
 
 **YAML:** entryfan.yaml

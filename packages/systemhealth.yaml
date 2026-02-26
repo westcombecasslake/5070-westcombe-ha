@@ -37,7 +37,8 @@ automation:
   # --------------------------------------------------
   # Insteon System - OFFLINE Detection
   # --------------------------------------------------
-  - alias: "System Health - Insteon System Offline"
+  - id: system_health_insteon_offline
+    alias: "System Health - Insteon System Offline"
     trigger:
       - platform: state
         entity_id:
@@ -61,7 +62,8 @@ automation:
   # --------------------------------------------------
   # Insteon System - ONLINE Recovery
   # --------------------------------------------------
-  - alias: "System Health - Insteon System Online"
+  - id: system_health_insteon_online
+    alias: "System Health - Insteon System Online"
     trigger:
       - platform: state
         entity_id:
@@ -83,7 +85,8 @@ automation:
   # --------------------------------------------------
   # YoLink System - OFFLINE Detection
   # --------------------------------------------------
-  - alias: "System Health - YoLink System Offline"
+  - id: system_health_yolink_offline
+    alias: "System Health - YoLink System Offline"
     trigger:
       - platform: state
         entity_id:
@@ -108,7 +111,8 @@ automation:
   # --------------------------------------------------
   # YoLink System - ONLINE Recovery
   # --------------------------------------------------
-  - alias: "System Health - YoLink System Online"
+  - id: system_health_yolink_online
+    alias: "System Health - YoLink System Online"
     trigger:
       - platform: state
         entity_id:
@@ -131,7 +135,8 @@ automation:
   # --------------------------------------------------
   # Ecobee Thermostat - OFFLINE Detection
   # --------------------------------------------------
-  - alias: "System Health - Ecobee Offline"
+  - id: system_health_ecobee_offline
+    alias: "System Health - Ecobee Offline"
     trigger:
       - platform: state
         entity_id: sensor.main_floor_current_temperature
@@ -153,7 +158,8 @@ automation:
   # --------------------------------------------------
   # Ecobee Thermostat - ONLINE Recovery
   # --------------------------------------------------
-  - alias: "System Health - Ecobee Online"
+  - id: system_health_ecobee_online
+    alias: "System Health - Ecobee Online"
     trigger:
       - platform: state
         entity_id: sensor.main_floor_current_temperature
@@ -173,7 +179,8 @@ automation:
   # --------------------------------------------------
   # Ring Doorbell - OFFLINE Detection
   # --------------------------------------------------
-  - alias: "System Health - Ring Doorbell Offline"
+  - id: system_health_ring_offline
+    alias: "System Health - Ring Doorbell Offline"
     trigger:
       - platform: state
         entity_id: sensor.front_door_battery
@@ -195,7 +202,8 @@ automation:
   # --------------------------------------------------
   # Ring Doorbell - ONLINE Recovery
   # --------------------------------------------------
-  - alias: "System Health - Ring Doorbell Online"
+  - id: system_health_ring_online
+    alias: "System Health - Ring Doorbell Online"
     trigger:
       - platform: state
         entity_id: sensor.front_door_battery
@@ -217,7 +225,8 @@ automation:
   # Triggered whenever any individual status changes.
   # Shows "Normal" when all four are Online, else "Problem".
   # --------------------------------------------------
-  - alias: "System Health - Update Overall Integrations Status"
+  - id: system_health_integrations_status_update
+    alias: "System Health - Update Overall Integrations Status"
     trigger:
       - platform: state
         entity_id:

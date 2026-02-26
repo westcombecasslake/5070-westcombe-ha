@@ -8,19 +8,19 @@
 # exhaust ventilation to maintain healthy indoor air quality.
 #
 # FEATURES:
-# • PM2.5 filtration takes priority over all other HVAC fan automation
-# • CO2 managed via exhaust ventilation when PM2.5 levels allow
-# • Party mode enhanced monitoring with periodic reminders
-# • Daily air quality summaries with trend comparison
-# • Sensor offline detection
-# • Four-tier Pushover notification system
+# * PM2.5 filtration takes priority over all other HVAC fan automation
+# * CO2 managed via exhaust ventilation when PM2.5 levels allow
+# * Party mode enhanced monitoring with periodic reminders
+# * Daily air quality summaries with trend comparison
+# * Sensor offline detection
+# * Four-tier Pushover notification system
 #
 # HARDWARE:
-# • 2x IKEA Alpstuga sensors (CO2, PM2.5, TVOC)
+# * 2x IKEA Alpstuga sensors (CO2, PM2.5, TVOC)
 #   - Floor 1: Living area (sensor.living_area_co2, sensor.living_area_pm25)
 #   - Floor 2: Master bedroom (sensor.master_bedroom_co2, sensor.master_bedroom_pm25)
-# • HVAC fan with HEPA 13 + carbon filter (climate.ecobee via script)
-# • Exhaust fans: bathroom, laundry, kitchen hood
+# * HVAC fan with HEPA 13 + carbon filter (climate.ecobee via script)
+# * Exhaust fans: bathroom, laundry, kitchen hood
 #
 # THRESHOLDS (EPA/WHO Guidelines):
 # PM2.5 (μg/m³):

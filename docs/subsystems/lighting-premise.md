@@ -114,10 +114,10 @@ Provides motion-activated lighting at the front porch when Ring doorbell detects
 **Front Porch Motion Timer:**
 - `premise_front_porch_motion_timer`
 - Trigger: Ring motion detected (`event.front_door_motion`)
-- Condition: 
-  - Premise lights already off for the night
-  - Photocell is "on" (dark outside)
-  - Not during photocell daily reset (1:00 PM)
+- Condition:
+  - `input_boolean.front_motion_armed` is on (set at dusk, cleared at dawn — blocks daytime darkness from storms/overcast)
+  - `light.entry_closet_premise` is off (premise lights not already on)
+  - Not during photocell daily reset (12:58-1:01 PM guard window)
 - Action: 
   - Send notification if lights were off (new motion session)
   - Activate Scene 21 (double-send for reliability)
@@ -128,6 +128,30 @@ Provides motion-activated lighting at the front porch when Ring doorbell detects
 
 **Note on Ring Motion Events:**
 Ring may send duplicate motion events (same timestamp), but `mode: restart` handles this gracefully by simply restarting the timer. This ensures reliable operation without requiring debouncing logic.
+
+**YAML:** lightingpremise.yaml
+
+---
+
+## Front Porch Manual Override
+
+### What It Does
+
+When `light.front_porch_override` is manually turned on, automatically turns it off after 3 hours. Timer restarts if turned on again while running.
+
+### Hardware
+
+**Insteon Switch:**
+- Entity: `light.front_porch_override`
+- Controlled via Insteon Scene 29
+
+### Automations
+
+**Front Porch Manual Override:**
+- `premise_front_porch_manual_override`
+- Trigger: `light.front_porch_override` turns on
+- Action: Wait 3 hours, deactivate Scene 29 (double-send)
+- Mode: `restart` — timer resets on repeated activation
 
 **YAML:** lightingpremise.yaml
 

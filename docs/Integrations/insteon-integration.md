@@ -116,23 +116,23 @@ The Insteon integration is more complex than typical integrations due to its dev
 - Scene continues to work if HA fails
 - Devices can trigger scenes directly (motion sensor → lights)
 
-### Critical: Use service: Not action: for Insteon Calls
+### Critical: Use action: Not service: for Insteon Calls
 
-**⚠️ Insteon scene commands must use `service:` syntax — not `action:`.**
+**⚠️ Insteon scene commands must use `action:` syntax — not `service:`.**
 
 ```yaml
 # CORRECT
-- service: insteon.scene_on
+- action: insteon.scene_on
   data:
     group: 21
 
 # WRONG -- silently fails; scenes do not execute
-- action: insteon.scene_on
+- service: insteon.scene_on
   data:
     group: 21
 ```
 
-This was discovered in production (February 2026): automations triggered and sent Pushover notifications correctly, but Insteon scenes did not execute. The `action:` keyword is the modern HA syntax and works for all other service calls in this system — but the Insteon integration requires the legacy `service:` keyword. Do not change Insteon calls to `action:` when editing or reviewing YAML.
+Confirmed in production (February 2026): `service:` syntax does not execute Insteon scenes. The `action:` keyword is the correct syntax for Insteon calls in this system. Do not change Insteon calls to `service:` when editing or reviewing YAML.
 
 ### This System's 13 Insteon Scenes
 
@@ -242,8 +242,8 @@ Multiple physical switches control the same lights without additional wiring. Ex
 Since this system uses Insteon scenes called from automations, you'll find scene calls throughout the YAML files:
 
 **Example locations:**
-- `lightingpremise.yaml` - Scene 21 (Premise Lights), Scene 31 (Lamp fade-up)
-- `lightingindoor.yaml` - Scene 23 (Seasonal), Scene 24 (Lamps off), Scene 30 (Master bedroom)
+- `lightingpremise.yaml` - Scene 21 (Premise Lights), Scene 29 (Front Porch Override)
+- `lightingindoor.yaml` - Scene 23 (Seasonal), Scene 24 (Lamps), Scene 30 (Master bedroom), Scene 31 (Lamp fade-up)
 - `garage.yaml` - Scene 20 (Garage lights)
 
 **To find all scene calls:**

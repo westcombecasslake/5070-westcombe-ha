@@ -54,7 +54,7 @@ input_boolean:
 
 automation:
   # --------------------------------------------------
-  # Master Bath Humidity — Shower Detection (Polling)
+  # Master Bath Humidity - Shower Detection (Polling)
   #
   # Runs every 30 seconds to check humidity patterns.
   # Detects rising humidity, sets baseline, confirms with delay,
@@ -89,7 +89,7 @@ automation:
 
       - choose:
           # --------------------------------------------------
-          # Case 1: Fan is running — check if we should turn off
+          # Case 1: Fan is running - check if we should turn off
           # --------------------------------------------------
           - conditions:
               - condition: template
@@ -142,7 +142,7 @@ automation:
                 data: {}
 
           # --------------------------------------------------
-          # Case 2: Safety timeout exceeded — force fan off
+          # Case 2: Safety timeout exceeded - force fan off
           # --------------------------------------------------
           - conditions:
               - condition: template
@@ -180,14 +180,14 @@ automation:
                     Check humidity sensor and automation logic.
 
           # --------------------------------------------------
-          # Case 3: Detecting shower — monitor for rising humidity
+          # Case 3: Detecting shower - monitor for rising humidity
           # --------------------------------------------------
           - conditions:
               - condition: template
                 value_template: "{{ fan_state == 'off' and baseline == 0 }}"
             sequence:
               - choose:
-                  # Sub-case: Rising humidity detected — START confirmation
+                  # Sub-case: Rising humidity detected - START confirmation
                   - conditions:
                       - condition: template
                         value_template: >
@@ -260,7 +260,7 @@ automation:
                       value: "{{ current_humidity }}"
 
   # --------------------------------------------------
-  # Master Bath Humidity — Timeout Reset
+  # Master Bath Humidity - Timeout Reset
   #
   # If humidity hasn't changed in 15 minutes and fan is off,
   # reset baseline/peak to prevent stale values from triggering
@@ -296,7 +296,7 @@ automation:
           entity_id: input_boolean.master_bath_confirmation_pending
 
   # --------------------------------------------------
-  # Master Bath Fan — Manual Timer
+  # Master Bath Fan - Manual Timer
   #
   # If fan is manually turned on (not by automation),
   # automatically turn it off after 15 minutes.
