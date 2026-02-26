@@ -44,7 +44,7 @@ Reviewed alongside relevant subsystem — not standalone unless noted.
 | pushover-integration.md | battery-monitoring-system session | Pending |
 | ring-integration.md | lighting-premise session | Pending |
 | sun-integration.md | lighting-premise session | Pending |
-| backup-integration.md | Standalone (small) | Pending |
+| backup-integration.md | Standalone (small) | Complete -- February 2026 |
 
 ---
 
@@ -55,7 +55,7 @@ Reviewed alongside relevant subsystem — not standalone unless noted.
 | README.md | Pending |
 | apps.md | Pending |
 | device-inventory.md | Pending |
-| insteon-scenes.md | Pending |
+| insteon-scenes.md | Complete -- February 2026 |
 | transferring-ownership.md | Pending |
 
 ---

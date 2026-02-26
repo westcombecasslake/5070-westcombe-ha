@@ -121,7 +121,7 @@ The spreadsheet contains:
 ### Override Scenes
 
 #### Garage Front Porch Override (0x1D)
-- **Control:** `switch.front_porch_override`
+- **Control:** `light.front_porch_override`
 - **Purpose:** Manual override of automated porch outlet schedules
 - **Use Case:** Keep seasonal lights on during parties/events
 - **Behavior:** Bypasses normal timer automation
@@ -134,7 +134,7 @@ The spreadsheet contains:
 
 **lightingpremise.yaml:**
 - Premise Lights (0x15) - Sunset activation
-- Living Room Lamps - Fade up (0x1F) - Pre-dusk ramp
+- Garage Front Porch Override (0x1D) - Manual override timer
 
 **smokeco.yaml:**
 - HVAC Fans Off on Siren (0x1C) - Smoke distribution prevention
@@ -142,6 +142,8 @@ The spreadsheet contains:
 **lightingindoor.yaml:**
 - Seasonal Lights (0x17) - Holiday decoration control
 - Living Room Lamps (0x18) - Evening routines
+- Master Bedroom Lights (0x1E) - Bedroom scene
+- Living Room Lamps - Fade up (0x1F) - Pre-dusk ramp
 
 ---
 
@@ -174,5 +176,5 @@ The spreadsheet contains:
 ## Programming Notes
 
 - Scenes persist in Insteon device link tables
-- Backup stored in `/mnt/project/insteon_scenes.json`
+- Backup stored in `/config/insteon_scenes.json`
 - Test scenes individually after any device replacement

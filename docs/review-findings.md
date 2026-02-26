@@ -351,3 +351,44 @@ Doc says "Daily summaries at 7:00 AM." YAML automation runs at 23:55 (11:55 PM).
 |------|--------|-------------|-------|
 | airquality.yaml | Yes | Mostly | 0 open |
 | air-quality-monitoring.md | -- | Encoding corrupted | 0 open |
+
+---
+
+## Project Docs -- insteon-scenes.md, backup-integration.md
+
+**Reviewed:** February 2026
+
+---
+
+### insteon-scenes.md
+
+**RESOLVED -- Scene 29 entity ID wrong**
+Doc had `switch.front_porch_override`. Corrected to `light.front_porch_override` February 2026.
+
+**RESOLVED -- Scene usage table errors**
+- Scene 31 (Lamps Fade-up) was listed under lightingpremise.yaml -- moved to lightingindoor.yaml
+- Scene 29 (Garage Front Porch Override) was missing from lightingpremise.yaml section -- added
+- Scene 30 (Master Bedroom) was missing from lightingindoor.yaml section -- added
+
+**RESOLVED -- Backup path wrong**
+`/mnt/project/insteon_scenes.json` corrected to `/config/insteon_scenes.json`.
+
+**INFO -- Scene list and hex/decimal table accurate. 13 scenes confirmed.**
+
+---
+
+### backup-integration.md
+
+**INFO -- Clean. Accurately documents built-in HA backup + Nabu Casa cloud + Google Drive secondary backup.**
+
+**KNOWN ISSUE -- Encoding corruption**
+Navigation arrows (→) display as garbled sequences. Not corrected -- consistent with policy on encoding issues.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| insteon-scenes.md | -- | Corrected | 0 open |
+| backup-integration.md | -- | Yes | 0 open |
