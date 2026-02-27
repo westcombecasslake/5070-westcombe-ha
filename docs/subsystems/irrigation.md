@@ -6,7 +6,7 @@
 
 ## Overview
 
-The Irrigation subsystem controls back patio drip irrigation with weather-aware scheduling that checks rainfall history and precipitation probability before running. The system includes explicit enable/disable control, temperature-based runtime adjustment, manual override capability, and deadman safety protection to prevent uncontrolled operation.
+The Irrigation subsystem controls back patio drip irrigation with weather-aware scheduling that checks current weather state before running. The system includes explicit enable/disable control, temperature-based runtime adjustment, manual override capability, and deadman safety protection to prevent uncontrolled operation.
 
 All irrigation control requires the system enable latch to be ON, providing a clear safety mechanism to completely disable the system when it's been winterized for the year or maintenance. Runtime is automatically adjusted based on outdoor temperature to match plant water needs without manual schedule changes.
 
@@ -16,7 +16,7 @@ All irrigation control requires the system enable latch to be ON, providing a cl
 
 ### What It Does
 
-Automatically calculates daily irrigation runtime based on outdoor temperature, then runs the irrigation cycle at 7:45 AM if weather conditions are appropriate. Checks recent rainfall and precipitation probability to skip irrigation when nature has already provided adequate water.
+Automatically calculates daily irrigation runtime based on outdoor temperature, then runs the irrigation cycle at 7:45 AM if weather conditions are appropriate. Skips irrigation when the weather state indicates active precipitation (rainy, pouring, lightning-rainy, or snowy-rainy).
 
 **Rationale:** Temperature-based runtime adjustment matches water needs without manual intervention (25 minutes below 80°F, 45 minutes at 80°F+). Weather checks prevent unnecessary watering after rain, saving water and preventing overwatering. Morning timing (7:45 AM) minimizes evaporation while completing before heat of day.
 
@@ -63,7 +63,7 @@ Automatically calculates daily irrigation runtime based on outdoor temperature, 
 - Trigger: 7:45 AM daily
 - Condition: System enabled AND weather state not rainy/pouring/lightning-rainy/snowy-rainy
 - Action: Runs irrigation for calculated runtime
-- Note: PoP threshold helper is currently display-only in notifications — not yet wired into skip condition (post-deployment improvement)
+- Note: PoP threshold value is included in the start notification for reference
 
 **YAML:** irrigation.yaml
 
@@ -125,9 +125,8 @@ Provides manual 30-minute irrigation run button for spot watering needs and enfo
 - `input_number.irrigation_zone_runtime` - Auto-calculated runtime (0-60 min)
   - Set by temperature automation, can be manually adjusted
 - `input_number.irrigation_pop_threshold` - Precipitation probability threshold (0-100%)
-  - Currently display-only in notifications — not yet wired into skip condition
-  - Post-deployment: will gate automatic cycle when PoP exceeds threshold
-  - Default: No initial value set — configure before first use
+  - Displayed in automatic cycle start notifications for reference
+  - Default: No initial value set
 
 **Manual Control:**
 - `input_button.irrigation_manual_30min` - Triggers 30-minute manual run
@@ -192,8 +191,8 @@ Provides manual 30-minute irrigation run button for spot watering needs and enfo
 - Disable system via `input_boolean.irrigation_system_enabled`
 
 **Irrigation skipping too many days:**
-- Check `input_number.irrigation_pop_threshold` value
-- Lower threshold = less likely to skip (more aggressive watering)
+- Skip only triggers on active precipitation states (rainy/pouring/lightning-rainy/snowy-rainy)
+- Check `weather.forecast_home_2` state when skip occurs
 - Review weather forecast accuracy for location
 
 ---

@@ -533,6 +533,44 @@ Battery review had noted garage motion sensor removed from wrong section with no
 
 ---
 
+## Irrigation -- irrigation.yaml
+
+**Reviewed:** February 2026
+
+---
+
+### irrigation.yaml
+
+**INFO -- All 4 automation IDs present. Clean.**
+
+**INFO -- Notification routing correct. Auto cycle to operational_log, manual to house_notices, deadman to house_alerts.**
+
+**RESOLVED -- Post-deployment TODO comment in header**
+Removed per policy. PoP threshold comment rewritten to describe current behavior only.
+
+---
+
+### irrigation.md (doc)
+
+**RESOLVED -- Multiple post-deployment references removed**
+Overview, automation note, user controls, and troubleshooting section all
+corrected to describe current behavior. PoP threshold documented as
+display-only in notifications, not a skip condition.
+
+**DEFERRED -- PoP threshold wiring**
+Added to follow-up.md for future implementation.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| irrigation.yaml | Yes | Yes | 0 |
+| irrigation.md | -- | Corrected | 0 |
+
+---
+
 ## Appliances -- fridgefreezer.yaml
 
 **Reviewed:** February 2026

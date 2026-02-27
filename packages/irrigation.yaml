@@ -15,10 +15,8 @@
 #
 # WEATHER SKIP:
 # - Skips if weather state is rainy/pouring/lightning-rainy/snowy-rainy
-# - PoP threshold helper (irrigation_pop_threshold) is defined but not yet
-#   wired into skip logic - currently display-only in notifications.
-#   Post-deployment: wire PoP threshold into condition to skip if forecast
-#   probability of precipitation exceeds threshold value.
+# - PoP threshold helper (irrigation_pop_threshold) is defined and displays
+#   in automatic cycle notifications for reference; not used in skip logic.
 #
 # NOTIFICATIONS:
 # - operational_log: automatic cycle start

@@ -17,7 +17,7 @@
 | battery-monitoring-system.md | batteryalerts | pushover-integration.md | Complete -- February 2026 |
 | fridgefreezer.md | fridgefreezer | yolink-integration.md | Complete -- February 2026 |
 | garage.md | garage | insteon-integration.md, yolink-integration.md | Complete -- February 2026 |
-| irrigation.md | irrigation | insteon-integration.md | Pending |
+| irrigation.md | irrigation | insteon-integration.md | Complete -- February 2026 |
 | laundry.md | laundry | yolink-integration.md | Complete -- February 2026 |
 | washerdryernotify.md | washerdryernotify | yolink-integration.md | Complete -- February 2026 |
 
