@@ -305,12 +305,9 @@ Scene 31 (Living Room Lamps Fade-up) is used in lightingindoor.yaml but only app
 
 | File | IDs OK | Doc Matches | Flags |
 |------|--------|-------------|-------|
-| lightingindoor.yaml | Yes | Yes | 1 open (see below) |
-| insteon-integration.md | -- | Mostly | 0 open (pending lightingpremise review) |
+| lightingindoor.yaml | Yes | Yes | 0 |
+| insteon-integration.md | -- | Yes | 0 |
 | sun-integration.md | -- | Yes | 0 |
-
-**FLAG -- lightingindoor.yaml uses service: for all Insteon scene calls**
-lightingpremise.yaml (confirmed working for weeks) uses action: for Insteon calls. lightingindoor.yaml uses service:, which per production experience does NOT execute Insteon scenes. The living room lamp, seasonal, and master bedroom scene automations may be silently failing. Needs verification.
 
 ---
 

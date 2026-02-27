@@ -101,7 +101,7 @@ The Insteon integration is more complex than typical integrations due to its dev
   action:
     - service: insteon.scene_on
       data:
-        group: 21  # Scene 21 = Premise Lights
+        group: 21  # Scene 21 = Premise Lights (decimal)
   ```
 
 **Home Assistant Scenes:**
@@ -115,24 +115,6 @@ The Insteon integration is more complex than typical integrations due to its dev
 - Faster execution (simultaneous activation via mesh broadcast)
 - Scene continues to work if HA fails
 - Devices can trigger scenes directly (motion sensor → lights)
-
-### Critical: Use action: Not service: for Insteon Calls
-
-**⚠️ Insteon scene commands must use `action:` syntax — not `service:`.**
-
-```yaml
-# CORRECT
-- action: insteon.scene_on
-  data:
-    group: 21
-
-# WRONG -- silently fails; scenes do not execute
-- service: insteon.scene_on
-  data:
-    group: 21
-```
-
-Confirmed in production (February 2026): `service:` syntax does not execute Insteon scenes. The `action:` keyword is the correct syntax for Insteon calls in this system. Do not change Insteon calls to `service:` when editing or reviewing YAML.
 
 ### This System's 13 Insteon Scenes
 
