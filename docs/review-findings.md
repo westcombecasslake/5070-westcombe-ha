@@ -436,6 +436,39 @@ Location line removed from examples -- not present in YAML.
 
 ---
 
+## Appliances -- laundry.yaml
+
+**Reviewed:** February 2026
+
+---
+
+### laundry.yaml
+
+**INFO -- Both automation IDs present. Clean.**
+
+**INFO -- HVAC boost called correctly. ASCII clean.**
+
+**RESOLVED -- Stale POST-DEPLOYMENT NOTE in header**
+Note about dryer notification timing was a leftover TODO comment. No notification exists in this package (dryer-finished notification is in washerdryernotify.yaml). Removed February 2026. Build fix comments do not belong in production code.
+
+---
+
+### laundry.md (doc)
+
+**RESOLVED -- Doc echoed the stale note**
+"Post-deployment: notification fires at fan shutoff" line removed from automation description. Doc otherwise matches YAML exactly.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| laundry.yaml | Yes | Yes | 0 |
+| laundry.md | -- | Corrected | 0 |
+
+---
+
 ## Appliances -- fridgefreezer.yaml
 
 **Reviewed:** February 2026

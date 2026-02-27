@@ -31,9 +31,6 @@
 #   - Baseline = 0 (uninitialized), OR
 #   - Dryer off for 4+ hours (14400 seconds)
 #
-# POST-DEPLOYMENT NOTE:
-# - Dryer finished notification fires when fan turns off, not when dryer
-#   cycle ends. Move notification to dryer power-drop event for accuracy.
 ###############################################################################
 
 input_number:

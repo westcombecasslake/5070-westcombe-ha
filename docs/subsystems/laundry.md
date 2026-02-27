@@ -65,7 +65,6 @@ Automatically detects dryer operation through power monitoring, sets a temperatu
   - Repeat loop checks every 2 minutes
   - Continue until temp drops to baseline + 3°F OR 45 min timeout
   - Calls `script.hvac_exhaust_boost` when fan turns off
-  - Post-deployment: notification fires at fan shutoff, not dryer cycle end
 - Baseline Update Conditions:
   - Current temp < stored baseline (room has cooled), OR
   - Baseline = 0 (uninitialized), OR
