@@ -501,6 +501,38 @@ washer_running_set and dryer_running_set were implied in helpers description but
 
 ---
 
+## Garage -- garage.yaml
+
+**Reviewed:** February 2026
+
+---
+
+### garage.yaml
+
+**INFO -- Both automation IDs present. Clean.**
+
+**INFO -- Insteon double-send correct on both ON and OFF. service: syntax. ASCII clean.**
+
+**INFO -- Notification routing correct. Freeze alert to house_alerts.**
+
+---
+
+### garage.md (doc)
+
+**RESOLVED -- Battery monitoring reference missing from Related Systems**
+Battery review had noted garage motion sensor removed from wrong section with note to document under garage.md. Battery Monitoring callout added to Related Systems February 2026.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| garage.yaml | Yes | Yes | 0 |
+| garage.md | -- | Updated | 0 |
+
+---
+
 ## Appliances -- fridgefreezer.yaml
 
 **Reviewed:** February 2026

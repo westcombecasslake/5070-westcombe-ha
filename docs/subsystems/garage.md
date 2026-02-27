@@ -136,6 +136,11 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 - Scene 20: Garage lighting
 - See: insteon-scenes.md
 
+**Battery Monitoring:**
+- Motion sensor, door sensors, and temperature sensor batteries monitored separately
+- Two-level battery alerts (30% and 15%)
+- See: battery-monitoring-system.md
+
 ---
 
 ## Troubleshooting
