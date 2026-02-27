@@ -45,3 +45,12 @@ subsystem reviews. These are not bugs -- implement or investigate when ready.
 - File: `/homeassistant/packages/irrigation.yaml`
 
 ---
+
+## Power Infrastructure
+
+**Create subsystem doc**
+- `powerinfrastructure.yaml` has no doc -- skipped during initial review as single-automation package
+- If the package grows, create `docs/subsystems/powerinfrastructure.md`
+- File: `/homeassistant/packages/powerinfrastructure.yaml`
+
+---

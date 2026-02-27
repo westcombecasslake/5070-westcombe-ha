@@ -1,13 +1,13 @@
-# ==================================================
+# --------------------------------------------------
 # Power Infrastructure
 #
 # Preventive power cycling for devices that
 # require periodic resets to maintain reliability.
-# ==================================================
+# --------------------------------------------------
 
 automation:
   # --------------------------------------------------
-  # Kitchen Vent Hood – Daily Power Reset
+  # Kitchen Vent Hood - Daily Power Reset
   #
   # Purpose:
   #   Prevent electronics lock-up by briefly

@@ -571,6 +571,35 @@ Added to follow-up.md for future implementation.
 
 ---
 
+## Power Infrastructure -- powerinfrastructure.yaml
+
+**Reviewed:** February 2026
+
+---
+
+### powerinfrastructure.yaml
+
+**INFO -- Single automation ID present. Clean.**
+
+**RESOLVED -- En dash in comment (Rule 17)**
+Line 10 used en dash (U+2013) in comment. Replaced with plain hyphen February 2026.
+
+**RESOLVED -- Equals-sign separator in header (Rule 17)**
+Outer header used ==== separators. Replaced with ---- February 2026.
+
+**DEFERRED -- No subsystem doc**
+Single-automation package. Doc creation deferred to follow-up.md.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| powerinfrastructure.yaml | Yes | No doc | 0 |
+
+---
+
 ## Appliances -- fridgefreezer.yaml
 
 **Reviewed:** February 2026

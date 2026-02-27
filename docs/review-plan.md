@@ -27,7 +27,7 @@
 
 | Package | Notes | Status |
 |---------|-------|--------|
-| powerinfrastructure.yaml | No doc exists — decide during review if one needed | Pending |
+| powerinfrastructure.yaml | No doc -- deferred to follow-up.md | Complete -- February 2026 |
 
 ---
 
