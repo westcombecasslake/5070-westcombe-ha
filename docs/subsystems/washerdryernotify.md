@@ -46,17 +46,27 @@ Monitors washer and dryer power consumption and sends notifications when cycles 
 
 ### Automations
 
+**Washer Running Flag:**
+- `washer_running_set`
+- Trigger: Power exceeds 10W
+- Action: Sets `input_boolean.washer_running` on
+
 **Washer Cycle Complete:**
 - `washer_cycle_complete_notification`
 - Trigger: Power drops below 5W for 2 minutes
-- Condition: `input_boolean.washer_running` is on (set when power exceeded 10W)
-- Notification: "🧺 Washer Complete" with timestamp
+- Condition: `input_boolean.washer_running` is on
+- Action: Sends notification, clears running flag
+
+**Dryer Running Flag:**
+- `dryer_running_set`
+- Trigger: Power exceeds 200W
+- Action: Sets `input_boolean.dryer_running` on
 
 **Dryer Cycle Complete:**
 - `dryer_cycle_complete_notification`
 - Trigger: Power drops below 2W for 2 minutes
-- Condition: `input_boolean.dryer_running` is on (set when power exceeded 200W)
-- Notification: "👕 Dryer Complete" with timestamp
+- Condition: `input_boolean.dryer_running` is on
+- Action: Sends notification, clears running flag
 
 **YAML:** washerdryernotify.yaml
 

@@ -19,7 +19,7 @@
 | garage.md | garage | insteon-integration.md, yolink-integration.md | Pending |
 | irrigation.md | irrigation | insteon-integration.md | Pending |
 | laundry.md | laundry | yolink-integration.md | Complete -- February 2026 |
-| washerdryernotify.md | washerdryernotify | yolink-integration.md | Pending |
+| washerdryernotify.md | washerdryernotify | yolink-integration.md | Complete -- February 2026 |
 
 ---
 

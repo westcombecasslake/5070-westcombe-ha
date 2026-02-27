@@ -469,6 +469,38 @@ Note about dryer notification timing was a leftover TODO comment. No notificatio
 
 ---
 
+## Appliances -- washerdryernotify.yaml
+
+**Reviewed:** February 2026
+
+---
+
+### washerdryernotify.yaml
+
+**INFO -- All 4 automation IDs present. Clean.**
+
+**INFO -- Notification routing correct. Both to house_notices.**
+
+**INFO -- ASCII clean. Emoji in notification title strings (values), not comments.**
+
+---
+
+### washerdryernotify.md (doc)
+
+**RESOLVED -- Two automations missing from Automations section**
+washer_running_set and dryer_running_set were implied in helpers description but not listed. Added February 2026.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| washerdryernotify.yaml | Yes | Yes | 0 |
+| washerdryernotify.md | -- | Corrected | 0 |
+
+---
+
 ## Appliances -- fridgefreezer.yaml
 
 **Reviewed:** February 2026
