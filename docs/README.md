@@ -72,10 +72,10 @@ Four-tier Pushover system -- never mix tiers:
 | Laundry | `laundry.yaml` | Dryer cycle completion, HVAC fan boost |
 | Garage | `garage.yaml` | Motion lighting, freeze alerts |
 | Irrigation | `irrigation.yaml` | Seasonal schedule automation |
-| Battery Monitoring | `batteryalerts.yaml` | 23 devices, 30%/15% two-tier alerting |
+| Battery Monitoring | `batteryalerts.yaml` | 24 devices, 30%/15% two-tier alerting |
 | System Health | `systemhealth.yaml` | Integration status, daily health reports |
 | System Startup | `systemstartup.yaml` | Post-restart status restoration |
-| Power Infrastructure | `powerinfrastructure.yaml` | Power monitoring |
+| Power Infrastructure | `powerinfrastructure.yaml` | Preventive power cycling for devices requiring periodic resets |
 | Entry Fan | `entryfan.yaml` | Entry bathroom fan control |
 
 See `/docs/subsystems/` for detailed documentation on each subsystem.
@@ -105,9 +105,9 @@ See `/docs/subsystems/` for detailed documentation on each subsystem.
 
 ## Key Design Decisions
 
-Full rationale preserved in `build-decisions.md`. Critical items:
+Full rationale preserved in `builddecisions.md`. Critical items:
 
-- **Insteon scene calls use `service:` not `action:`** -- `action:` syntax silently fails for Insteon; discovered in production February 2026
+- **All Insteon scene commands use `service:` syntax** with decimal scene numbers (never hex)
 - **All Insteon scene commands double-send** with 3-second delay -- fire-and-forget protocol, no acknowledgment
 - **Photocell is primary for premise lights**, not sun schedule -- sun is backup failsafe only
 - **Battery alerts split by tier** -- 30% to `battery_alerts`, 15% to `house_alerts` (safety gap)

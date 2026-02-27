@@ -52,11 +52,11 @@ Reviewed alongside relevant subsystem — not standalone unless noted.
 
 | Doc | Status |
 |-----|--------|
-| README.md | Pending |
-| apps.md | Pending |
-| device-inventory.md | Pending |
+| README.md | Complete -- February 2026 |
+| apps.md | Complete -- February 2026 |
+| device-inventory.md | Complete -- February 2026 |
 | insteon-scenes.md | Complete -- February 2026 |
-| transferring-ownership.md | Pending |
+| transferring-ownership.md | Complete -- February 2026 (Samba ref remains, low priority) |
 
 ---
 

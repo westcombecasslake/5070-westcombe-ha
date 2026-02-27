@@ -8,11 +8,13 @@
 
 ## Installed Apps
 
-This system has three apps installed:
+This system has five apps installed:
 
 1. **Home Assistant Google Drive Backup** - Secondary backup system
-2. **Samba Share** - Network file access  
-3. **Studio Code Server** - Web-based YAML editor
+2. **Studio Code Server** - Web-based YAML editor
+3. **Claude Code** - AI-assisted automation development
+4. **Matter Server** - Matter protocol controller (background service)
+5. **Open Thread Border Router** - Thread border router via ZBT-2 hardware (background service)
 
 ---
 
@@ -123,110 +125,57 @@ This provides a **second backup system** independent of the built-in HA backup:
 
 ---
 
-# Samba Share
+# Claude Code
 
-**Type:** Network File Access  
-**Purpose:** Expose Home Assistant folders via SMB/CIFS for network access  
+**Type:** AI-Assisted Development
+**Purpose:** AI coding assistant with direct access to Home Assistant files
 **Status:** Active
 
 ---
 
-## What is Samba Share?
+## What is Claude Code?
 
-An add-on/app that exposes Home Assistant configuration folders to your local network using the SMB/CIFS protocol. Allows access to HA files from other computers on the network.
+An add-on that runs Claude (Anthropic's AI) directly inside the Home Assistant container, with full read/write access to all configuration files. Replaces the Samba + external editor workflow — files are read and edited in place, no file transfers needed.
 
 **Key Features:**
-- Network access to HA config files
-- Windows/Mac/Linux compatible
-- Edit files remotely
-- Browse directories
-- Copy files to/from HA
+- Direct read/write access to `/homeassistant/` files
+- AI-assisted YAML writing, review, and debugging
+- Bash command execution within the container
+- Code search and analysis across all packages
+- Git integration for version control
+- Persistent memory across sessions
 
 ---
 
 ## Role in This System
 
-**Network File Access:**
-- Move files from Claude AI web client downloads to HA directories
-- Primary use: Transfer files to `/config/packages/` and `/config/docs/`
-- Copy files to/from Home Assistant
-- Browse HA directory structure
-- Access configuration files from network
+**Primary automation development tool:**
+- Write and review YAML automation packages
+- Conduct subsystem reviews (cross-check YAML against docs)
+- Maintain documentation alongside code
+- Run git commits after each change
 
-**Common Uses:**
-- Move documentation files created in Claude to `/config/docs/`
-- Transfer YAML packages from downloads to `/config/packages/`
-- Copy backup files to local computer
-- Upload files to HA (scripts, images, etc.)
-- Review logs and configuration
-- Edit files with desktop editor if needed
+**Replaces Samba for file work:**
+- Files are edited directly in the container — no download/upload cycle
+- Changes take effect immediately without file transfers
 
 ---
 
-## Accessing Samba Share
+## Accessing Claude Code
 
-**From Windows:**
-1. Open File Explorer
-2. Navigate to: `\\homeassistant` or `\\192.168.50.54`
-3. Enter credentials if prompted
-4. Browse available folders
-
-**From Mac:**
-1. Finder → Go → Connect to Server
-2. Enter: `smb://homeassistant` or `smb://192.168.50.54`
-3. Enter credentials if prompted
-4. Browse available folders
-
-**From Linux:**
-1. File manager → Connect to Server
-2. Enter: `smb://homeassistant` or `smb://192.168.50.54`
-3. Enter credentials
-4. Browse available folders
-
----
-
-## Available Folders
-
-**Key directories for file transfers:**
-- `/config/packages/` - **Primary target for YAML package files**
-- `/config/docs/` - **Primary target for documentation files**
-- `/config` - Main configuration folder
-- `/addons` - Add-on data
-- `/backup` - Local backups
-- `/share` - Shared data folder
-- `/ssl` - SSL certificates
-
-**Typical Workflow:**
-1. Create files in Claude AI web client
-2. Download files to local computer
-3. Access HA via Samba Share on network
-4. Copy files to `/config/packages/` or `/config/docs/`
-5. Files immediately available to Home Assistant
-
----
-
-## Configuration
-
-**Access Credentials:**
-- Username/password configured in Samba Share settings
-- Different from HA login credentials
-- Can be unique credentials for network access
-
-**Network Settings:**
-- Accessible on local network only
-- Not exposed to internet
-- Uses standard SMB/CIFS ports
+**Via Apps Page:**
+1. Settings → Apps
+2. Click "Claude Code"
+3. Opens terminal session with Claude
 
 ---
 
 ## Important Notes
 
-- **Local network only** - not accessible from internet
-- **File editing** - use with caution, validate YAML syntax
-- **Configuration access** - provides direct access to all config files
-- **Credentials needed** - separate from HA login
-- **Windows/Mac/Linux** - compatible with all platforms
-- **Security** - ensure strong password for network access
+- **Requires Anthropic API key** - configured in add-on settings
+- **Direct file access** - operates on live configuration files; changes apply immediately
+- **Git recommended** - commit changes after each session for rollback capability
+- **Session memory** - maintains context across conversations via memory files in `/root/.claude/`
 
 ---
 
@@ -256,9 +205,9 @@ An add-on/app that provides a full Visual Studio Code (VSCode) editor accessible
 
 ## Role in This System
 
-**Primary Code Editor:**
-- **Recommended way to add and check code** in Home Assistant
-- **This was used to build the entire system** - all YAML packages created here
+**Manual Code Editor:**
+- Direct YAML editing with syntax highlighting and entity validation
+- Useful for quick edits, browsing the file tree, or when Claude Code is not needed
 - Edit YAML configuration files
 - Create and modify automations
 - Edit scripts and packages
@@ -379,6 +328,85 @@ Studio Code Server can be accessed remotely through Nabu Casa's remote UI. Howev
 
 ---
 
+# Matter Server
+
+**Type:** Protocol Infrastructure
+**Purpose:** Matter controller required for all Matter devices
+**Status:** Active (must remain running)
+
+---
+
+## What is Matter Server?
+
+A background add-on that runs the Python Matter Server, implementing the Matter smart home protocol controller. All Matter devices in this system require this server to communicate with Home Assistant.
+
+**Key Features:**
+- Implements Matter controller for Home Assistant
+- Manages Matter device commissioning and communication
+- Required for all Matter/Thread device operation
+- Runs as a background service with no user interface
+
+---
+
+## Role in This System
+
+**Required infrastructure for Matter devices:**
+- IKEA air quality sensors (CO2, PM2.5, TVOC) in airquality.yaml
+- Bathroom fan switches (middle bath, east bath)
+
+**This app must remain running at all times.** Stopping it disconnects all Matter devices from Home Assistant.
+
+---
+
+## Important Notes
+
+- **Background service** - no user interface, just needs to be running
+- **Do not stop** - disconnects all Matter devices
+- **Auto-starts** - configured to start automatically with HA
+- See: matter-thread-integration.md
+
+---
+
+# Open Thread Border Router
+
+**Type:** Protocol Infrastructure
+**Purpose:** Thread border router using Silicon Labs ZBT-2 hardware
+**Status:** Active (must remain running)
+
+---
+
+## What is Open Thread Border Router?
+
+A background add-on that provides Thread border router functionality using the Silicon Labs ZBT-2 chip built into the Home Assistant Green. Thread devices communicate via this border router to reach the IP network and Home Assistant.
+
+**Key Features:**
+- Thread border router using ZBT-2 hardware built into HA Green
+- Bridges Thread mesh network to IP network
+- Required for all Thread device communication
+- Runs as a background service with no user interface
+
+---
+
+## Role in This System
+
+**Required infrastructure for Thread devices:**
+- IKEA air quality sensors communicate via Thread
+- Bathroom fan switches (middle bath, east bath) use Thread/Matter
+
+**This app must remain running at all times.** Stopping it disconnects all Thread devices.
+
+---
+
+## Important Notes
+
+- **Background service** - no user interface, just needs to be running
+- **Do not stop** - disconnects all Thread devices
+- **Hardware dependent** - requires Silicon Labs ZBT-2 installed in HA Green
+- **Auto-starts** - configured to start automatically with HA
+- See: matter-thread-integration.md
+
+---
+
 # App Management
 
 ## Accessing Apps
@@ -413,14 +441,17 @@ Studio Code Server can be accessed remotely through Nabu Casa's remote UI. Howev
 
 **All Apps Transfer:**
 - Google Drive Backup → Account: westcombecasslake@gmail.com
-- Samba Share → Set new credentials if desired
 - Studio Code Server → Protected by HA authentication
+- Claude Code → Requires new owner's Anthropic API key
+- Matter Server → No account needed, transfers automatically
+- Open Thread Border Router → No account needed, transfers automatically
 
 **After Ownership Transfer:**
 1. Update Google Drive Backup with new Google account (or keep house account)
-2. Change Samba Share credentials if desired
-3. Studio Code Server automatically works with new HA credentials
-4. Test all apps functionality
+2. Studio Code Server automatically works with new HA credentials
+3. Claude Code: replace Anthropic API key in add-on settings with your own
+4. Matter Server and Open Thread Border Router require no changes
+5. Verify all Matter/Thread devices are online after transfer
 
 ---
 
@@ -431,20 +462,20 @@ Studio Code Server can be accessed remotely through Nabu Casa's remote UI. Howev
 
 **Specific Apps:**
 - Google Drive Backup: https://github.com/sabeechen/hassio-google-drive-backup
-- Samba Share: https://github.com/home-assistant/addons/tree/master/samba
 - Studio Code Server: https://github.com/hassio-addons/addon-vscode
+- Matter Server: https://github.com/home-assistant-libs/python-matter-server
+- Open Thread Border Router: https://github.com/home-assistant/addons/tree/master/openthread_border_router
 
 ---
 
 ## Important Notes
 
-- **Three apps installed** - Google Drive Backup, Samba, Studio Code Server
+- **Five apps installed** - Google Drive Backup, Studio Code Server, Claude Code, Matter Server, Open Thread Border Router
 - **Google Drive account** - westcombecasslake@gmail.com (transfers with house)
 - **Backup redundancy** - Two independent backup systems for protection
-- **Network access** - Samba provides file access from other computers
-- **Code editing** - Studio Code Server for advanced YAML editing
+- **Infrastructure apps** - Matter Server and Open Thread Border Router must always be running
+- **Code editing** - Studio Code Server for manual YAML editing, Claude Code for AI-assisted development
 - **All protected** - Apps require authentication for security
-- **Local network** - Apps accessible on local network, not internet (by default)
 - **Location** - Settings → Apps
 - **Launch icons** - Apps with interfaces show in left navigation bar
 

@@ -600,6 +600,65 @@ Single-automation package. Doc creation deferred to follow-up.md.
 
 ---
 
+## Project-Level Docs
+
+**Reviewed:** February 2026
+
+---
+
+### README.md
+
+**RESOLVED -- Incorrect Insteon syntax note**
+Line 110 stated `action:` silently fails. Replaced with accurate statement: all Insteon scene commands use `service:` syntax with decimal scene numbers.
+
+**RESOLVED -- Battery device count wrong**
+Said 23 devices. Corrected to 24 (fixed during battery-monitoring review).
+
+**RESOLVED -- Power Infrastructure description wrong**
+Said "Power monitoring." Corrected to "Preventive power cycling for devices requiring periodic resets."
+
+**RESOLVED -- Wrong filename reference**
+`build-decisions.md` corrected to `builddecisions.md`.
+
+---
+
+### apps.md
+
+**RESOLVED -- Samba removed, Claude Code added**
+Samba Share is no longer installed. Replaced with Claude Code section.
+
+**RESOLVED -- Matter Server and Open Thread Border Router missing**
+Two infrastructure apps not documented. Sections added for both.
+
+**RESOLVED -- Stale references to Samba throughout**
+App list count, Official Resources, Important Notes, Migration Notes all updated.
+
+**RESOLVED -- Studio Code Server role description updated**
+Was "recommended way to add code." Updated to reflect Claude Code as primary dev tool.
+
+---
+
+### device-inventory.md
+
+**INFO -- Clean. No changes.**
+
+### transferring-ownership.md
+
+**INFO -- Clean. Samba Share Network Access section remains -- flag for update when ownership transfer is actually being prepared.**
+
+---
+
+### Summary
+
+| File | Status | Flags |
+|------|--------|-------|
+| README.md | Corrected | 0 |
+| apps.md | Corrected | 0 |
+| device-inventory.md | Clean | 0 |
+| transferring-ownership.md | Mostly clean | Samba ref remains (low priority) |
+
+---
+
 ## Appliances -- fridgefreezer.yaml
 
 **Reviewed:** February 2026
