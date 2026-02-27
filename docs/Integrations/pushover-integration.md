@@ -153,18 +153,16 @@ All YoLink battery devices send two levels of low battery notifications:
 ```
 Title: 🔋 Low Battery Warning
 Message: Device: Garage Motion Sensor
-         Location: Garage wall facing out
          Battery Level: 28%
-         
+
          Order replacement battery
 ```
 
 ```
 Title: 🔋 CRITICAL Battery Alert
 Message: Device: South Bedroom Smoke Detector
-         Location: South Bedroom ceiling
          Battery Level: 12%
-         
+
          REPLACE IMMEDIATELY
 ```
 

@@ -14,7 +14,7 @@
 | lighting-indoor.md | lightingindoor | insteon-integration.md, sun-integration.md | Complete -- February 2026 |
 | lighting-premise.md | lightingpremise | insteon-integration.md, ring-integration.md, sun-integration.md | Complete -- February 2026 |
 | air-quality-monitoring.md | airquality | matter-thread-integration.md | Complete -- February 2026 |
-| battery-monitoring-system.md | batteryalerts | pushover-integration.md | Pending |
+| battery-monitoring-system.md | batteryalerts | pushover-integration.md | Complete -- February 2026 |
 | fridgefreezer.md | fridgefreezer | yolink-integration.md | Pending |
 | garage.md | garage | insteon-integration.md, yolink-integration.md | Pending |
 | irrigation.md | irrigation | insteon-integration.md | Pending |
@@ -41,7 +41,7 @@ Reviewed alongside relevant subsystem — not standalone unless noted.
 | insteon-integration.md | lighting sessions | Pending |
 | homekit-device-integration.md | environmental-control session | Pending |
 | matter-thread-integration.md | environmental-control session | Pending |
-| pushover-integration.md | battery-monitoring-system session | Pending |
+| pushover-integration.md | battery-monitoring-system session | Complete -- February 2026 |
 | ring-integration.md | lighting-premise session | Pending |
 | sun-integration.md | lighting-premise session | Pending |
 | backup-integration.md | Standalone (small) | Complete -- February 2026 |

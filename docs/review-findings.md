@@ -392,3 +392,47 @@ Navigation arrows (→) display as garbled sequences. Not corrected -- consisten
 |------|--------|-------------|-------|
 | insteon-scenes.md | -- | Corrected | 0 open |
 | backup-integration.md | -- | Yes | 0 open |
+
+---
+
+## Battery Monitoring -- batteryalerts.yaml, battery-monitoring-system.md, pushover-integration.md
+
+**Reviewed:** February 2026
+
+---
+
+### batteryalerts.yaml
+
+**INFO -- All 3 automation IDs present. Clean.**
+
+**INFO -- 24 devices monitored. Matches doc.**
+
+---
+
+### battery-monitoring-system.md
+
+**RESOLVED -- battery_recovery automation documented but not built**
+Removed from doc. Automation was proposed and removed due to side effects during connectivity issues.
+
+**RESOLVED -- Battery Status Helper thresholds wrong**
+Doc said Normal >20%, Low <20%, Critical <10%. Corrected to match YAML: Low <30%, Critical <15%.
+
+**RESOLVED -- Garage Motion Sensor miscategorized under Leak Detection**
+Removed from Leak Detection. Device count updated to 24. Will be documented under garage.md.
+
+---
+
+### pushover-integration.md
+
+**RESOLVED -- Location field in battery notification example**
+Location line removed from examples -- not present in YAML.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| batteryalerts.yaml | Yes | Yes | 0 open |
+| battery-monitoring-system.md | -- | Corrected | 0 open |
+| pushover-integration.md | -- | Corrected | 0 open |
