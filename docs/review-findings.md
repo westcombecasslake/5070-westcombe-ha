@@ -25,8 +25,8 @@ IDs added February 2026:
 - smoke_co_all_clear_recovery
 - smoke_co_daily_status_summary
 
-**FLAG — Emergency Response uses `climate.ecobee` entity for fan shutoff**
-The Emergency Response automation calls `climate.set_fan_mode` on `climate.ecobee` (entity_id) to shut down the HVAC fan during a smoke/CO event. Builddecisions rule 8 states fan control must use `device_id: c38113c2d02da790b689d4a3bdc4b5e1` only via the HomeKit Device integration. Needs clarification: are these two different service calls (climate entity vs. HomeKit Device fan boost), or is this a conflict? The hvac_exhaust_boost script is not used here.
+**RESOLVED — Emergency Response uses `climate.ecobee` entity for fan shutoff**
+Confirmed intentional. Fan mode (on/auto) is exposed via the climate entity and `climate.set_fan_mode` is the correct call for shutoff. The `device_id` approach in `hvac_exhaust_boost` is required only for the boost feature, which is not exposed as an entity. No conflict with builddecisions rule 8.
 
 **INFO — Notification format in safety-monitoring.md is outdated**
 Doc shows older single-line notification examples (v1 format). Actual YAML uses consolidated Emergency Response with HVAC/fan shutdown confirmation in message. Doc examples do not reflect current behavior. Not a functional issue — doc needs updating at some point.
@@ -59,8 +59,8 @@ The safety-monitoring.md Battery Status section implies a daily summary but that
 
 ### safety-monitoring.md (doc)
 
-**FLAG — Battery alert threshold shows 15% only**
-The Battery Status section documents only a 15% threshold. Builddecisions rule 12 defines a two-level system (30% to battery_alerts, 15% to house_alerts). Update safety-monitoring.md battery section during battery subsystem review.
+**RESOLVED — Battery alert threshold shows 15% only**
+safety-monitoring.md updated February 2026 to reflect two-tier system: 30% to battery_alerts, 15% to house_alerts.
 
 **INFO — Notification examples outdated**
 Smoke/CO detection examples in the doc reflect v1 behavior. Current YAML sends a consolidated Emergency Response with HVAC/fan shutdown messaging. Minor doc drift.
@@ -107,8 +107,8 @@ YoLink offline is arguably safety-relevant (silences smoke/CO sensors). Intentio
 **INFO -- No recovery notification on online recovery**
 Recovery automations only update the status helper. No Pushover on recovery. Intentional -- avoids noise.
 
-**INFO -- safety-monitoring.md System Health section has doc drift**
-Doc describes features not present in YAML: binary_sensor.ha_startup_pending, database size monitoring, network connectivity monitoring. Actual YAML is scoped to 4 integration status helpers + combined status helper. Doc needs rewrite to match reality.
+**RESOLVED -- safety-monitoring.md System Health section has doc drift**
+Doc updated February 2026: removed binary_sensor.ha_startup_pending, database size monitoring, network connectivity monitoring, and Recorder Configuration section. Startup Monitoring section rewritten to reflect actual systemstartup.yaml behavior.
 
 ---
 
@@ -119,8 +119,8 @@ Doc describes features not present in YAML: binary_sensor.ha_startup_pending, da
 **INFO -- Two-level alert system confirmed**
 30% warning -> notify.battery_alerts (normal priority). 15% critical -> notify.house_alerts (high priority). Matches builddecisions rule 12. Condition on 30% alert (> 15%) prevents double-alerting.
 
-**FLAG -- safety-monitoring.md battery section documents only 15% threshold**
-The Battery Status section shows only 15% threshold and incorrect routing (house_notices). Actual system has two tiers with split routing. Needs doc rewrite.
+**RESOLVED -- safety-monitoring.md battery section documents only 15% threshold**
+Doc updated February 2026 to reflect two-tier system with correct routing.
 
 ---
 

@@ -403,9 +403,17 @@ All battery-powered sensors report their battery status to Home Assistant:
 
 ### Alert Strategy
 
+Two-tier system — order soon vs. replace immediately:
+
+```yaml
+Trigger: battery_level attribute < 30% (and > 15%)
+Alert: battery_alerts (NORMAL PRIORITY)
+Frequency: Daily until replaced
+```
+
 ```yaml
 Trigger: battery_level attribute < 15%
-Alert: House Notices (NORMAL PRIORITY)
+Alert: house_alerts (HIGH PRIORITY)
 Frequency: Daily until replaced
 ```
 
@@ -415,7 +423,7 @@ Title: 🔋 Low Battery Alert
 Message: Device: [Device Name]
          Location: [Physical Location]
          Battery Level: [X]%
-         
+
          Replace battery soon
 ```
 
@@ -454,35 +462,19 @@ Battery status entities can be added to dashboards for at-a-glance monitoring:
 - System uptime
 - Restart events
 - Integration status
-- Database size
 
 **Hub Status:**
 - YoLink Hub connectivity
 - Ecobee API status
 
-**Network:**
-- Local network connectivity
-- Internet connectivity
-- DNS resolution
-
 ### Startup Monitoring
 
-```yaml
-Entity: binary_sensor.ha_startup_pending
-States: 
-  - "on" = System starting up
-  - "off" = Fully operational
-```
+Startup handling is managed by `systemstartup.yaml`. On every restart:
 
-**Startup Sequence:**
-```
-1. Home Assistant starts
-2. Core integrations load
-3. Packages initialize
-4. Startup automation runs
-5. Status set to operational
-6. Notification sent
-```
+1. 30-second delay to allow integrations to load
+2. Status refresh script runs
+3. Integration helpers reset to Online
+4. `house_alerts` notification sent (every restart, not just unexpected ones)
 
 ### Alert Conditions
 
@@ -500,31 +492,6 @@ Alert: House Notices (NORMAL PRIORITY)
 Action: Log restart reason if available
 ```
 
-**Database Growth:**
-```yaml
-Trigger: Database size exceeds threshold
-Alert: House Notices (NORMAL PRIORITY)
-Action: Notify to review recorder configuration
-```
-
-### Recorder Configuration
-
-Optimized for performance and relevant history:
-
-**Included Domains:**
-- All safety sensors (smoke, CO, leak)
-- All monitored switches and sensors
-- Automation states for debugging
-
-**Excluded:**
-- High-frequency updates (< 1 second)
-- Derived sensors (calculated from other sensors)
-- Temporary/working variables
-
-**Retention:**
-- Default: 10 days
-- Critical events: 90 days
-- Consider external long-term logging for analytics
 
 ---
 
