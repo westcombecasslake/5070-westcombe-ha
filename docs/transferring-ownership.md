@@ -451,39 +451,21 @@ If you replace the internet router/gateway:
 
 ---
 
-### Samba Share Network Access
+### Studio Code Server
 
-**Purpose:** Access Home Assistant files from other computers on network
+**Purpose:** Browse and edit Home Assistant files from a browser-based editor
 
-**Note:** Home Assistant Green can also be accessed via Samba for file management (connected via Ethernet).
+**Note:** Studio Code Server provides full VS Code access to all configuration files from any browser on the network or remotely via Nabu Casa.
 
 **Use Cases:**
-- Transfer documentation files to HA
-- Edit YAML configuration files
-- Copy backup files locally
-- Browse HA directory structure
+- Browse and edit YAML automation files
+- Review documentation
+- View logs and configuration
 
-**Access Credentials:** Provided in credentials document
-
-**How to Connect:**
-
-**From Windows:**
-1. File Explorer → Address bar
-2. Type: `\\homeassistant` or `\\192.168.50.54` (if hostname doesn't resolve)
-3. Enter credentials when prompted
-4. Browse `/config/docs/` for documentation
-
-**From Mac:**
-1. Finder → Go → Connect to Server
-2. Type: `smb://homeassistant`
-3. Enter credentials when prompted
-4. Browse `/config/docs/` for documentation
-
-**Available Folders:**
-- `/config/packages/` - YAML automation files
-- `/config/docs/` - This documentation
-- `/backup/` - Local backups
-- `/share/` - Shared data
+**How to Access:**
+1. Settings → Apps → Studio Code Server → Start
+2. Click the launch icon in the left HA navigation bar
+3. Navigate to `/config/packages/` or `/config/docs/`
 
 **Documentation:** See `/docs/apps.md`
 
@@ -498,9 +480,8 @@ All system documentation is stored on the Home Assistant server at:
 **Location:** `/config/docs/`
 
 **How to Access:**
-1. Via Samba Share (see above)
-2. Via Studio Code Server app in HA
-3. Files also provided on USB drive at closing
+1. Via Studio Code Server app in HA
+2. Files also provided on USB drive at closing
 
 **Documentation Includes:**
 - `README.md` - Start here
@@ -533,7 +514,6 @@ A complete credentials document will be provided containing:
 - Ring account login
 - Ecobee account login
 - Home Assistant web interface login
-- Samba share network access credentials
 - WiFi network name and password
 
 **Format:** Text file with all credentials listed
