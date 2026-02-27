@@ -15,7 +15,7 @@
 | lighting-premise.md | lightingpremise | insteon-integration.md, ring-integration.md, sun-integration.md | Complete -- February 2026 |
 | air-quality-monitoring.md | airquality | matter-thread-integration.md | Complete -- February 2026 |
 | battery-monitoring-system.md | batteryalerts | pushover-integration.md | Complete -- February 2026 |
-| fridgefreezer.md | fridgefreezer | yolink-integration.md | Pending |
+| fridgefreezer.md | fridgefreezer | yolink-integration.md | Complete -- February 2026 |
 | garage.md | garage | insteon-integration.md, yolink-integration.md | Pending |
 | irrigation.md | irrigation | insteon-integration.md | Pending |
 | laundry.md | laundry | yolink-integration.md | Pending |

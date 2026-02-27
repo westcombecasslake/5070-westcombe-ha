@@ -16,18 +16,18 @@
 # 4. Garage Freezer (non-HVAC, aggressive defrost cycles)
 #
 # ALERT LEVELS:
-# ⚠️  Warning (house_notices):
+# WARNING (house_notices):
 #    - Temperature elevated but not critical
 #    - 20-30 minute delay to avoid grocery loading false positives
 #    - Non-urgent awareness notification
 #
-# 🚨 Critical (house_alerts):
+# CRITICAL (house_alerts):
 #    - Door Left Open: High temp + High humidity
 #    - Compressor Failure: High temp + Normal humidity
 #    - 10-15 minute delay for immediate action
 #    - Emergency priority notification
 #
-# ✅ Recovery (house_notices):
+# RECOVERY (house_notices):
 #    - Temperature returned to normal
 #    - Informational notification with recovery time
 #

@@ -198,35 +198,39 @@ The system uses both **temperature** and **humidity** readings to distinguish be
 
 ## Automations
 
-### Per-Appliance Automation Set (5 automations × 4 appliances = 20 total)
+### Per-Appliance Automation Set (4 automations × 4 appliances = 16 total)
 
 **Kitchen Fridge Automations:**
 1. `kitchen_fridge_warning` - Temperature warning (>40°F, 30 min)
 2. `kitchen_fridge_critical_door` - Door open alert (>42°F + >65% humidity, 15 min)
 3. `kitchen_fridge_critical_compressor` - Compressor failure (>45°F, 15 min)
 4. `kitchen_fridge_recovery` - Temperature recovered (<38°F, 5 min)
-5. Alert state: `input_boolean.kitchen_fridge_alert_active`
+
+Alert state helper: `input_boolean.kitchen_fridge_alert_active`
 
 **Kitchen Freezer Automations:**
 1. `kitchen_freezer_warning` - Temperature warning (>22°F, 20 min)
 2. `kitchen_freezer_critical_door` - Door open alert (>23°F + >94% humidity, 15 min)
 3. `kitchen_freezer_critical_compressor` - Compressor failure (>25°F, 10 min)
 4. `kitchen_freezer_recovery` - Temperature recovered (<5°F, 5 min)
-5. Alert state: `input_boolean.kitchen_freezer_alert_active`
+
+Alert state helper: `input_boolean.kitchen_freezer_alert_active`
 
 **Garage Fridge Automations:**
 1. `garage_fridge_warning` - Temperature warning (>40°F, 30 min)
 2. `garage_fridge_critical_door` - Door open alert (>42°F + >45% humidity, 15 min)
 3. `garage_fridge_critical_compressor` - Compressor failure (>45°F, 15 min)
 4. `garage_fridge_recovery` - Temperature recovered (<38°F, 5 min)
-5. Alert state: `input_boolean.garage_fridge_alert_active`
+
+Alert state helper: `input_boolean.garage_fridge_alert_active`
 
 **Garage Freezer Automations:**
 1. `garage_freezer_warning` - Temperature warning (>18°F, 25 min)
 2. `garage_freezer_critical_door` - Door open alert (>25°F + >92% humidity, 12 min)
 3. `garage_freezer_critical_compressor` - Compressor failure (>30°F, 12 min)
 4. `garage_freezer_recovery` - Temperature recovered (<5°F, 5 min)
-5. Alert state: `input_boolean.garage_freezer_alert_active`
+
+Alert state helper: `input_boolean.garage_freezer_alert_active`
 
 **YAML:** fridgefreezer.yaml
 
@@ -481,7 +485,7 @@ All thresholds were calibrated from 2 days of actual sensor history (Feb 13-14, 
 - **No False Positives:** Grocery loading spikes ignored by design
 - **Recovery Confirmation:** Always notified when temperature normalizes
 - **Four Appliances:** Each monitored independently with tailored thresholds
-- **20 Automations:** 5 per appliance (warn, door, compressor, recovery, state)
+- **16 Automations:** 4 per appliance (warn, door, compressor, recovery) plus 4 alert state helpers
 - **YoLink Platform:** Requires YoLink Hub and active integration
 - **Battery Separate:** Battery monitoring handled by batteryalerts.yaml
 - **Non-HVAC Garage:** Garage thresholds account for seasonal variations

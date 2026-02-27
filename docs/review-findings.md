@@ -433,3 +433,38 @@ Location line removed from examples -- not present in YAML.
 | batteryalerts.yaml | Yes | Yes | 0 open |
 | battery-monitoring-system.md | -- | Corrected | 0 open |
 | pushover-integration.md | -- | Corrected | 0 open |
+
+---
+
+## Appliances -- fridgefreezer.yaml
+
+**Reviewed:** February 2026
+
+---
+
+### fridgefreezer.yaml
+
+**INFO -- All 16 automation IDs present. Clean.**
+
+**RESOLVED -- Emoji in YAML header comments (Rule 17)**
+Lines 19, 24, 30 used emoji (warning, critical, recovery icons) in comment block. Replaced with plain ASCII labels February 2026.
+
+**INFO -- Thresholds verified. All match doc exactly. No changes.**
+
+**INFO -- Notification routing correct. Warnings/recovery to house_notices, critical to house_alerts.**
+
+---
+
+### fridgefreezer.md (doc)
+
+**RESOLVED -- Automation count wrong**
+Doc said "5 automations x 4 appliances = 20 total" and listed alert state booleans as automations. Corrected to 16 automations (4 per appliance). Alert state helpers clarified as helpers, not automations. Important Notes footer updated to match.
+
+---
+
+### Summary
+
+| File | IDs OK | Doc Matches | Flags |
+|------|--------|-------------|-------|
+| fridgefreezer.yaml | Yes | Yes | 0 |
+| fridgefreezer.md | -- | Corrected | 0 |
