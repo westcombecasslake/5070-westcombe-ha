@@ -159,7 +159,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 - Independent of humidity-based control; useful for ventilation without showering
 
 **HVAC Coordination:**
-- When fan cycle completes (normal or timeout), calls `script.hvac_exhaust_boost`
+- When fan cycle completes normally, calls `script.hvac_exhaust_boost`
 - Script runs HVAC fan for 20 minutes to distribute remaining humidity
 - Script uses `mode: restart` so overlapping calls from multiple bathrooms reset the timer (last bathroom to finish sets the full 20-minute window)
 

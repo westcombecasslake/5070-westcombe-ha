@@ -210,42 +210,50 @@ automation:
                           confirmed_humidity: "{{ states('sensor.master_bath_humidity') | float(0) }}"
                           locked_peak: "{{ states('input_number.master_bath_humidity_peak') | float(0) }}"
 
-                      # If rise still present, start fan
-                      - condition: template
-                        value_template: >
-                          {% set threshold = 8 if confirmed_humidity < 50 else 5 %}
-                          {{ (confirmed_humidity - locked_peak) >= threshold }}
+                      # If rise still present, start fan - otherwise clean up lock
+                      - choose:
+                          - conditions:
+                              - condition: template
+                                value_template: >
+                                  {% set threshold = 8 if confirmed_humidity < 50 else 5 %}
+                                  {{ (confirmed_humidity - locked_peak) >= threshold }}
+                            sequence:
+                              # Set baseline to the locked peak value (original starting point)
+                              - service: input_number.set_value
+                                target:
+                                  entity_id: input_number.master_bath_humidity_baseline
+                                data:
+                                  value: "{{ locked_peak }}"
 
-                      # Set baseline to the locked peak value (original starting point)
-                      - service: input_number.set_value
-                        target:
-                          entity_id: input_number.master_bath_humidity_baseline
-                        data:
-                          value: "{{ locked_peak }}"
+                              # Update peak to current (confirmed) humidity
+                              - service: input_number.set_value
+                                target:
+                                  entity_id: input_number.master_bath_humidity_peak
+                                data:
+                                  value: "{{ confirmed_humidity }}"
 
-                      # Update peak to current (confirmed) humidity
-                      - service: input_number.set_value
-                        target:
-                          entity_id: input_number.master_bath_humidity_peak
-                        data:
-                          value: "{{ confirmed_humidity }}"
+                              # Start loop timer (use now() not pre-delay time_now)
+                              - service: input_number.set_value
+                                target:
+                                  entity_id: input_number.master_bath_fan_loop_start
+                                data:
+                                  value: "{{ now().timestamp() }}"
 
-                      # Start loop timer (use now() not pre-delay time_now)
-                      - service: input_number.set_value
-                        target:
-                          entity_id: input_number.master_bath_fan_loop_start
-                        data:
-                          value: "{{ now().timestamp() }}"
+                              # Turn on fan
+                              - service: light.turn_on
+                                target:
+                                  entity_id: light.master_bath_fan
 
-                      # Turn on fan
-                      - service: light.turn_on
-                        target:
-                          entity_id: light.master_bath_fan
+                              # Clear confirmation lock
+                              - service: input_boolean.turn_off
+                                target:
+                                  entity_id: input_boolean.master_bath_confirmation_pending
 
-                      # Clear confirmation lock
-                      - service: input_boolean.turn_off
-                        target:
-                          entity_id: input_boolean.master_bath_confirmation_pending
+                        # Clear confirmation lock if humidity dropped during delay
+                        default:
+                          - service: input_boolean.turn_off
+                            target:
+                              entity_id: input_boolean.master_bath_confirmation_pending
 
                 # Default: Update peak if NOT in confirmation period
                 default:
