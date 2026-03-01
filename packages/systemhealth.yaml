@@ -3,7 +3,7 @@
 #
 # Integration and hub offline alerts
 # Monitors multiple devices to detect system-wide failures
-# Provides helpers for Android Auto status display
+# Provides helpers and sensors for Android Auto status display
 # ==================================================
 
 # --------------------------------------------------
@@ -31,6 +31,27 @@ input_text:
   integrations_status:
     name: "Integrations Status"
     initial: "Normal"
+
+# --------------------------------------------------
+# Template sensors mirror input_text helpers above
+# for display in Android Auto favorites.
+# --------------------------------------------------
+template:
+  - sensor:
+      - name: "Insteon Status"
+        state: "{{ states('input_text.insteon_status') }}"
+
+      - name: "YoLink Status"
+        state: "{{ states('input_text.yolink_status') }}"
+
+      - name: "Ecobee Status"
+        state: "{{ states('input_text.ecobee_status') }}"
+
+      - name: "Ring Status"
+        state: "{{ states('input_text.ring_status') }}"
+
+      - name: "Integrations Status"
+        state: "{{ states('input_text.integrations_status') }}"
 
 automation:
 

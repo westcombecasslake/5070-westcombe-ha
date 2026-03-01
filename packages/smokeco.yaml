@@ -2,7 +2,7 @@
 # Smoke/CO Detection Package
 #
 # Monitors smoke and CO detectors for offline status and alerts
-# Provides helpers for Android Auto status display
+# Provides helpers and sensors for Android Auto status display
 #
 # Changes from v1:
 #   - Deduplicated: offline trigger on CO entity only (1 per physical device)
@@ -21,6 +21,10 @@
 #   - All Clear Recovery: restores fans, sends House Notice when all clear
 #   - Smoke Detected / CO Detected automations now update status helper only;
 #     notifications fully consolidated into Emergency Response
+#
+# Changes from v3:
+#   - Added template sensor for Android Auto glance display
+#   - Daily status summary moved to 23:55 (end of day with other reports)
 # ==================================================
 
 # --------------------------------------------------
@@ -34,6 +38,24 @@ input_text:
   smoke_co_alert_status:
     name: "Smoke/CO Alert Status"
     initial: "✅ Normal"
+
+# --------------------------------------------------
+# Template sensor mirrors helpers above for
+# Android Auto glance display (emoji-free, worst-state priority).
+# --------------------------------------------------
+template:
+  - sensor:
+      - name: "Smoke/CO"
+        state: >
+          {% if is_state('input_text.smoke_co_alert_status', '☠️ CO Detected') %}
+            CO DETECTED
+          {% elif is_state('input_text.smoke_co_alert_status', '🔥 Smoke Detected') %}
+            SMOKE DETECTED
+          {% elif is_state('input_text.smoke_co_online_status', '⚠️ Offline') %}
+            DETECTOR OFFLINE
+          {% else %}
+            Normal
+          {% endif %}
 
 # --------------------------------------------------
 # Per-Detector Notified Flags (cooldown / dedup)
@@ -398,7 +420,7 @@ automation:
             Verify area is safe before re-entry
 
   # --------------------------------------------------
-  # DAILY STATUS SUMMARY — 8:00 AM
+  # DAILY STATUS SUMMARY — 11:55 PM
   # Checks all 8 detectors (CO entity as proxy for device online state).
   # Always sends to Operational Log (silent, reviewed in morning).
   # If any detector is offline, also sends to House Notices.
@@ -407,7 +429,7 @@ automation:
     alias: "Smoke/CO - Daily Status Summary"
     trigger:
       - platform: time
-        at: "08:00:00"
+        at: "23:55:00"
     variables:
       status_lines: >
         {% set devices = [

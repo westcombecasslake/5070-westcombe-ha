@@ -58,6 +58,11 @@ input_boolean:
     name: Party Mode
     icon: mdi:party-popper
 
+input_text:
+  pm25_status:
+    name: "PM2.5 Status"
+    initial: "Normal"
+
 input_number:
   # Daily statistics tracking
   living_area_co2_max_today:
@@ -187,6 +192,14 @@ automation:
         target:
           entity_id: input_boolean.pm25_filtration_active
 
+      # Update status helper
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.pm25_status
+        data:
+          value: >
+            Active - {{ [states('sensor.living_area_pm25')|float(0), states('sensor.master_bedroom_pm25')|float(0)] | max | round(1) }} μg/m³
+
       # Store start time
       - service: input_number.set_value
         target:
@@ -306,7 +319,6 @@ automation:
   #
   # Deactivates filtration when both sensors show good air quality.
   # Returns HVAC fan to AUTO mode.
-  # UPDATED: Now tracks runtime duration.
   # --------------------------------------------------
   - id: air_quality_pm25_normal
     alias: "Air Quality - PM2.5 Normal"
@@ -343,6 +355,13 @@ automation:
         target:
           entity_id: input_boolean.pm25_filtration_active
 
+      # Clear status helper
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.pm25_status
+        data:
+          value: "Normal"
+
       # Return HVAC fan to auto
       - service: climate.set_fan_mode
         target:
@@ -366,7 +385,6 @@ automation:
   #
   # Returns to AUTO after 4 hours of continuous filtration
   # to prevent excessive HVAC runtime if sensor stuck.
-  # UPDATED: Tracks runtime even on timeout.
   # --------------------------------------------------
   - id: air_quality_pm25_safety_timeout
     alias: "Air Quality - PM2.5 Safety Timeout"
@@ -387,6 +405,13 @@ automation:
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.pm25_filtration_active
+
+      # Clear status helper
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.pm25_status
+        data:
+          value: "Normal"
 
       # Return to auto
       - service: climate.set_fan_mode
@@ -684,11 +709,7 @@ automation:
                   value: "{{ states('sensor.master_bedroom_pm25')|float(0) }}"
 
   # --------------------------------------------------
-  # Daily Summary Report
-  #
-  # Sends daily air quality summary at 11:55 PM.
-  # Includes max readings, filtration events/runtime, and trend comparison.
-  # NEW FORMAT: Split CO2 and PM2.5 onto separate lines with trend indicators.
+  # Daily Summary Report — 11:55 PM
   # --------------------------------------------------
   - id: air_quality_daily_summary
     alias: "Air Quality - Daily Summary"
@@ -792,8 +813,6 @@ automation:
             {{ status_msg }}
 
       # Update all 7-day rolling averages
-      # Formula: new_avg = (old_avg * 6 + today_value) / 7
-      
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filter_events_7day_avg
@@ -867,8 +886,6 @@ automation:
 
   # --------------------------------------------------
   # Sensor Offline Detection
-  #
-  # Alerts if air quality sensors go offline.
   # --------------------------------------------------
   - id: air_quality_sensor_offline_alert
     alias: "Air Quality - Sensor Offline Alert"
@@ -895,8 +912,6 @@ automation:
 
   # --------------------------------------------------
   # Sensor Recovery Notification
-  #
-  # Confirms when sensor comes back online.
   # --------------------------------------------------
   - id: air_quality_sensor_recovery
     alias: "Air Quality - Sensor Recovery"

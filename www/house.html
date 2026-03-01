@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Status</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1117;
+    --surface: #161b25;
+    --surface2: #1d2535;
+    --border: #252d3d;
+    --text: #e8edf5;
+    --text-muted: #8a9fc0;
+    --text-dim: #b0c2d8;
+    --ok: #2dd4a0;
+    --ok-bg: #0d2e25;
+    --warn: #f5a623;
+    --warn-bg: #2e2010;
+    --alert: #f5423d;
+    --alert-bg: #2e0e0d;
+    --accent: #4f8ef5;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f0f4f8;
+      --surface: #ffffff;
+      --surface2: #e8edf5;
+      --border: #d0d9e8;
+      --text: #1a2233;
+      --text-muted: #4a5568;
+      --text-dim: #2d3f5c;
+      --ok-bg: #e6faf4;
+      --warn-bg: #fff4e0;
+      --alert-bg: #fde8e8;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(79,142,245,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(45,212,160,0.04) 0%, transparent 60%);
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-left h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-left .subtitle { font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; margin-top: 3px; letter-spacing: 0.5px; }
+
+  .header-right { text-align: right; }
+  .timestamp { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); }
+  .timestamp .time { font-size: 20px; color: var(--text-dim); display: block; font-weight: 300; }
+  .last-updated { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  .section-label { font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; margin-top: 24px; padding-left: 2px; }
+
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; position: relative; overflow: hidden; transition: background 0.3s, border-color 0.3s; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 10px 10px 0 0; transition: background 0.3s; }
+  .card.ok::before { background: var(--ok); }
+  .card.warn::before { background: var(--warn); }
+  .card.alert::before { background: var(--alert); }
+  .card.neutral::before { background: var(--border); }
+  .card.ok { background: linear-gradient(135deg, var(--surface) 60%, var(--ok-bg)); border-color: rgba(45,212,160,0.2); }
+  .card.warn { background: linear-gradient(135deg, var(--surface) 60%, var(--warn-bg)); border-color: rgba(245,166,35,0.25); }
+  .card.alert { background: linear-gradient(135deg, var(--surface) 60%, var(--alert-bg)); border-color: rgba(245,66,61,0.25); }
+
+  .card-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px; margin-bottom: 8px; }
+  .card-value { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500; line-height: 1; }
+  .card.ok .card-value { color: var(--ok); }
+  .card.warn .card-value { color: var(--warn); }
+  .card.alert .card-value { color: var(--alert); }
+  .card.neutral .card-value { color: var(--text-dim); }
+
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 7px; vertical-align: middle; position: relative; top: -1px; }
+  .dot-ok { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .dot-warn { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .dot-alert { background: var(--alert); box-shadow: 0 0 6px var(--alert); animation: pulse 1.5s infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .system-bar { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; transition: background 0.3s; }
+  .system-bar-label { font-size: 12px; color: var(--text-dim); font-weight: 500; letter-spacing: 0.3px; }
+  .system-bar-value { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .system-bar-value.ok { color: var(--ok); }
+  .system-bar-value.warn { color: var(--warn); }
+  .system-bar-value.alert { color: var(--alert); }
+  .system-bar-value.neutral { color: var(--text-dim); }
+
+  .error-banner { background: var(--alert-bg); border: 1px solid var(--alert); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 12px; color: var(--alert); font-family: 'DM Mono', monospace; display: none; }
+</style>
+</head>
+<body>
+
+<script>
+  // ============================================================
+  // CONFIGURATION — update these two values
+  // ============================================================
+  const HA_URL   = "https://45yt8uxuisvmflbjzkczr77kr1jum1m0.ui.nabu.casa";
+  const HA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzY2U3OWJjYTQxOTI0YTNjYjM3ODM0ODlmZTBhMmI3MiIsImlhdCI6MTc3MjM5ODMwNywiZXhwIjoyMDg3NzU4MzA3fQ.UyfL-yfcrwXyA0tLisX9GkSdJ8o8FUfRGk5NEEsAq0s";
+  const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  // ============================================================
+
+  const ENTITIES = [
+    // Integrations
+    "input_text.integrations_status",
+    "input_text.insteon_status",
+    "input_text.yolink_status",
+    "input_text.ecobee_status",
+    "input_text.ring_status",
+    // Safety
+    "input_text.smoke_co_online_status",
+    "input_text.smoke_co_alert_status",
+    "input_text.battery_status",
+    // Appliances
+    "sensor.kitchen_fridge_temp_temperature",
+    "sensor.kitchen_freezer_temp_temperature",
+    "sensor.garage_fridge_temp_temperature",
+    "sensor.garage_freezer_temp_temperature",
+    // Sump Pump
+    "binary_sensor.sump_pump_depth_alert_door",
+    "binary_sensor.sump_leak_sensor_moisture",
+    "sensor.sump_pump_daily_cycles",
+    "sensor.sump_pump_daily_gallons",
+    "sensor.sump_pump_7_day_average_cycles",
+    // Air Quality
+    "sensor.living_area_co2",
+    "sensor.living_area_pm25",
+    "sensor.master_bedroom_co2",
+    "sensor.master_bedroom_pm25",
+    "input_text.pm25_status",
+  ];
+
+  async function fetchStates() {
+    const results = await Promise.all(
+      ENTITIES.map(id =>
+        fetch(`${HA_URL}/api/states/${id}`, {
+          headers: { Authorization: `Bearer ${HA_TOKEN}`, "Content-Type": "application/json" }
+        }).then(r => r.json()).catch(() => ({ entity_id: id, state: "unavailable" }))
+      )
+    );
+    const states = {};
+    results.forEach(r => { states[r.entity_id] = r.state; });
+    return states;
+  }
+
+  function statusClass(value, type) {
+    if (value === "unavailable" || value === "unknown") return "warn";
+    if (type === "integration") {
+      return value.trim().toLowerCase() === "online" ? "ok" : "warn";
+    }
+    if (type === "integration_overall") {
+      return value.trim().toLowerCase() === "normal" ? "ok" : "warn";
+    }
+    if (type === "smoke_online") {
+      return value.includes("Normal") ? "ok" : "warn";
+    }
+    if (type === "smoke_alert") {
+      if (value.includes("CO")) return "alert";
+      if (value.includes("Smoke")) return "alert";
+      return "ok";
+    }
+    if (type === "battery") {
+      if (value.trim().toLowerCase() === "critical") return "alert";
+      if (value.trim().toLowerCase() === "low") return "warn";
+      return "ok";
+    }
+    if (type === "fridge") {
+      const temp = parseFloat(value);
+      return temp > 40 ? "warn" : "ok";
+    }
+    if (type === "kitchen_freezer") {
+      const temp = parseFloat(value);
+      return temp > 22 ? "warn" : "ok";
+    }
+    if (type === "garage_freezer") {
+      const temp = parseFloat(value);
+      return temp > 18 ? "warn" : "ok";
+    }
+    if (type === "sump_depth") {
+      // off = Normal (door sensor), on = HIGH
+      return value === "off" ? "ok" : "alert";
+    }
+    if (type === "sump_moisture") {
+      return value === "off" ? "ok" : "alert";
+    }
+    if (type === "co2") {
+      const v = parseFloat(value);
+      if (v > 2000) return "alert";
+      if (v > 1000) return "warn";
+      return "ok";
+    }
+    if (type === "pm25") {
+      const v = parseFloat(value);
+      if (v > 55) return "alert";
+      if (v > 35) return "warn";
+      return "ok";
+    }
+    if (type === "pm25_status") {
+      return value.trim().toLowerCase() === "normal" ? "ok" : "warn";
+    }
+    return "neutral";
+  }
+
+  function dot(cls) {
+    return `<span class="dot dot-${cls}"></span>`;
+  }
+
+  function setCard(id, state, type, label) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    const cls = statusClass(state, type);
+    card.className = `card ${cls}`;
+    const valueEl = card.querySelector(".card-value");
+    if (valueEl) valueEl.innerHTML = `${dot(cls)}${label || state}`;
+  }
+
+  function setNeutralCard(id, value) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    card.className = "card neutral";
+    const valueEl = card.querySelector(".card-value");
+    if (valueEl) valueEl.textContent = value;
+  }
+
+  function setBar(id, state, type, label) {
+    const bar = document.getElementById(id);
+    if (!bar) return;
+    const cls = statusClass(state, type);
+    const valueEl = bar.querySelector(".system-bar-value");
+    if (valueEl) {
+      valueEl.className = `system-bar-value ${cls}`;
+      valueEl.innerHTML = `${dot(cls)}${label || state}`;
+    }
+  }
+
+  function formatTemp(val) {
+    const n = parseFloat(val);
+    return isNaN(n) ? "—" : `${n}°F`;
+  }
+
+  function formatCO2(val) {
+    const n = parseFloat(val);
+    return isNaN(n) ? "—" : `${n.toLocaleString()} ppm`;
+  }
+
+  function formatPM25(val) {
+    const n = parseFloat(val);
+    return isNaN(n) ? "—" : `${n} μg/m³`;
+  }
+
+  function updateClock() {
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const date = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    document.getElementById("clock-time").textContent = time;
+    document.getElementById("clock-date").textContent = date;
+  }
+
+  async function refresh() {
+    try {
+      const s = await fetchStates();
+
+      document.getElementById("error-banner").style.display = "none";
+
+      // Overall
+      setBar("bar-integrations", s["input_text.integrations_status"], "integration_overall",
+        s["input_text.integrations_status"]?.trim() || "—");
+
+      // Integrations
+      setCard("card-insteon", s["input_text.insteon_status"], "integration",
+        s["input_text.insteon_status"]?.trim());
+      setCard("card-yolink", s["input_text.yolink_status"], "integration",
+        s["input_text.yolink_status"]?.trim());
+      setCard("card-ecobee", s["input_text.ecobee_status"], "integration",
+        s["input_text.ecobee_status"]?.trim());
+      setCard("card-ring", s["input_text.ring_status"], "integration",
+        s["input_text.ring_status"]?.trim());
+
+      // Safety
+      const smokeOnline = s["input_text.smoke_co_online_status"] || "";
+      const smokeOnlineClean = smokeOnline.replace(/[✅⚠️]/g, "").trim();
+      setCard("card-smoke-online", smokeOnline, "smoke_online", smokeOnlineClean);
+
+      const smokeAlert = s["input_text.smoke_co_alert_status"] || "";
+      const smokeAlertClean = smokeAlert.replace(/[✅🔥☠️]/g, "").trim();
+      setCard("card-smoke-alert", smokeAlert, "smoke_alert", smokeAlertClean);
+
+      setCard("card-battery", s["input_text.battery_status"], "battery",
+        s["input_text.battery_status"]?.trim());
+
+      // Appliances
+      setCard("card-kfridge", s["sensor.kitchen_fridge_temp_temperature"], "fridge",
+        formatTemp(s["sensor.kitchen_fridge_temp_temperature"]));
+      setCard("card-kfreezer", s["sensor.kitchen_freezer_temp_temperature"], "kitchen_freezer",
+        formatTemp(s["sensor.kitchen_freezer_temp_temperature"]));
+      setCard("card-gfridge", s["sensor.garage_fridge_temp_temperature"], "fridge",
+        formatTemp(s["sensor.garage_fridge_temp_temperature"]));
+      setCard("card-gfreezer", s["sensor.garage_freezer_temp_temperature"], "garage_freezer",
+        formatTemp(s["sensor.garage_freezer_temp_temperature"]));
+
+      // Sump Pump
+      const depthVal = s["binary_sensor.sump_pump_depth_alert_door"];
+      setCard("card-sump-depth", depthVal, "sump_depth",
+        depthVal === "off" ? "Normal" : depthVal === "on" ? "HIGH!" : "—");
+
+      const moistureVal = s["binary_sensor.sump_leak_sensor_moisture"];
+      setCard("card-sump-moisture", moistureVal, "sump_moisture",
+        moistureVal === "off" ? "Dry" : moistureVal === "on" ? "WET!" : "—");
+
+      const cycles = s["sensor.sump_pump_daily_cycles"];
+      setNeutralCard("card-sump-cycles", isNaN(parseFloat(cycles)) ? "—" : cycles);
+
+      const gallons = s["sensor.sump_pump_daily_gallons"];
+      const gallonsFormatted = isNaN(parseFloat(gallons)) ? "—" : `${parseFloat(gallons).toFixed(1)} gal`;
+      setNeutralCard("card-sump-gallons", gallonsFormatted);
+
+      const avg = s["sensor.sump_pump_7_day_average_cycles"];
+      const avgBar = document.getElementById("bar-sump-avg");
+      if (avgBar) {
+        const el = avgBar.querySelector(".system-bar-value");
+        if (el) el.textContent = isNaN(parseFloat(avg)) ? "—" : `${parseFloat(avg).toFixed(1)} cycles/day`;
+      }
+
+      // Air Quality
+      const co2f1 = s["sensor.living_area_co2"];
+      setCard("card-co2-f1", co2f1, "co2", formatCO2(co2f1));
+
+      const pm25f1 = s["sensor.living_area_pm25"];
+      setCard("card-pm25-f1", pm25f1, "pm25", formatPM25(pm25f1));
+
+      const co2f2 = s["sensor.master_bedroom_co2"];
+      setCard("card-co2-f2", co2f2, "co2", formatCO2(co2f2));
+
+      const pm25f2 = s["sensor.master_bedroom_pm25"];
+      setCard("card-pm25-f2", pm25f2, "pm25", formatPM25(pm25f2));
+
+      const pm25Status = s["input_text.pm25_status"] || "Normal";
+      setBar("bar-pm25", pm25Status, "pm25_status", pm25Status.trim());
+
+      // Last updated
+      const now = new Date();
+      document.getElementById("last-updated").textContent =
+        "Updated " + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+
+    } catch (e) {
+      const banner = document.getElementById("error-banner");
+      banner.style.display = "block";
+      banner.textContent = "Unable to reach Home Assistant — check URL and token.";
+    }
+  }
+
+  // Wait for DOM before starting
+  document.addEventListener('DOMContentLoaded', () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+    refresh();
+    setInterval(refresh, REFRESH_INTERVAL);
+  });
+</script>
+
+<div id="error-banner" class="error-banner"></div>
+
+<header>
+  <div class="header-left">
+    <h1>Home Status</h1>
+    <div class="subtitle">WEST BLOOMFIELD · SYSTEM MONITOR</div>
+  </div>
+  <div class="header-right">
+    <div class="timestamp">
+      <span class="time" id="clock-time">—</span>
+      <span id="clock-date"></span>
+    </div>
+    <div class="last-updated" id="last-updated">Loading...</div>
+  </div>
+</header>
+
+<!-- Overall -->
+<div class="section-label">Overall</div>
+<div id="bar-integrations" class="system-bar">
+  <span class="system-bar-label">Integrations</span>
+  <span class="system-bar-value neutral">Loading...</span>
+</div>
+
+<!-- Integrations -->
+<div class="section-label">Integrations</div>
+<div class="grid-4">
+  <div id="card-insteon" class="card neutral"><div class="card-label">Insteon</div><div class="card-value">—</div></div>
+  <div id="card-yolink" class="card neutral"><div class="card-label">YoLink</div><div class="card-value">—</div></div>
+  <div id="card-ecobee" class="card neutral"><div class="card-label">Ecobee</div><div class="card-value">—</div></div>
+  <div id="card-ring" class="card neutral"><div class="card-label">Ring</div><div class="card-value">—</div></div>
+</div>
+
+<!-- Safety -->
+<div class="section-label">Safety</div>
+<div class="grid-3">
+  <div id="card-smoke-online" class="card neutral"><div class="card-label">Smoke/CO Detectors</div><div class="card-value">—</div></div>
+  <div id="card-smoke-alert" class="card neutral"><div class="card-label">Smoke/CO Alert</div><div class="card-value">—</div></div>
+  <div id="card-battery" class="card neutral"><div class="card-label">Batteries</div><div class="card-value">—</div></div>
+</div>
+
+<!-- Appliances -->
+<div class="section-label">Appliances</div>
+<div class="grid-4">
+  <div id="card-kfridge" class="card neutral"><div class="card-label">Kitchen Fridge</div><div class="card-value">—</div></div>
+  <div id="card-kfreezer" class="card neutral"><div class="card-label">Kitchen Freezer</div><div class="card-value">—</div></div>
+  <div id="card-gfridge" class="card neutral"><div class="card-label">Garage Fridge</div><div class="card-value">—</div></div>
+  <div id="card-gfreezer" class="card neutral"><div class="card-label">Garage Freezer</div><div class="card-value">—</div></div>
+</div>
+
+<!-- Sump Pump -->
+<div class="section-label">Sump Pump</div>
+<div class="grid-4">
+  <div id="card-sump-depth" class="card neutral"><div class="card-label">Depth</div><div class="card-value">—</div></div>
+  <div id="card-sump-moisture" class="card neutral"><div class="card-label">Floor Moisture</div><div class="card-value">—</div></div>
+  <div id="card-sump-cycles" class="card neutral"><div class="card-label">Today's Cycles</div><div class="card-value">—</div></div>
+  <div id="card-sump-gallons" class="card neutral"><div class="card-label">Today's Gallons</div><div class="card-value">—</div></div>
+</div>
+<div style="margin-top: 10px;">
+  <div id="bar-sump-avg" class="system-bar">
+    <span class="system-bar-label">7-Day Avg Cycles</span>
+    <span class="system-bar-value neutral">—</span>
+  </div>
+</div>
+
+<!-- Air Quality -->
+<div class="section-label">Air Quality</div>
+<div class="grid-4">
+  <div id="card-co2-f1" class="card neutral"><div class="card-label">Floor 1 CO2</div><div class="card-value">—</div></div>
+  <div id="card-pm25-f1" class="card neutral"><div class="card-label">Floor 1 PM2.5</div><div class="card-value">—</div></div>
+  <div id="card-co2-f2" class="card neutral"><div class="card-label">Floor 2 CO2</div><div class="card-value">—</div></div>
+  <div id="card-pm25-f2" class="card neutral"><div class="card-label">Floor 2 PM2.5</div><div class="card-value">—</div></div>
+</div>
+<div style="margin-top: 10px;">
+  <div id="bar-pm25" class="system-bar">
+    <span class="system-bar-label">PM2.5 Filtration</span>
+    <span class="system-bar-value neutral">—</span>
+  </div>
+</div>
+
+</body>
+</html>

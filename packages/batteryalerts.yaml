@@ -1,9 +1,17 @@
-# ==================================================
-# Battery Monitoring Package
+###############################################################################
+# BATTERY MONITORING PACKAGE
+###############################################################################
+# Place this file in: /config/packages/batteryalerts.yaml
 #
 # Monitors battery levels and sends tiered alerts
 # Provides helper for Android Auto status display
-# ==================================================
+#
+# Changes from v1:
+#   - Added unavailable detection per sensor — notifies with device name
+#   - Fixed battery_status_report to include unavailable sensors
+#   - Fixed update_battery_status to reflect unavailable sensors
+#   - Daily trigger moved to 23:55 (end of day with other reports)
+###############################################################################
 
 # --------------------------------------------------
 # Battery Status Helper (visible to all YAML files)
@@ -11,6 +19,7 @@
 input_text:
   battery_status:
     name: "Battery Status"
+    initial: "Normal"
 
 # --------------------------------------------------
 # Scripts
@@ -25,11 +34,15 @@ script:
           message: >
             {% set ns = namespace(msg='') %}
             {% for state in states.sensor %}
-              {% if '_battery' in state.entity_id and state.state | int(0) <= 30 and state.state | int(0) > 0 %}
-                {% set ns.msg = ns.msg + state.attributes.friendly_name + ': ' + state.state + '%\n' %}
+              {% if '_battery' in state.entity_id %}
+                {% if state.state == 'unavailable' %}
+                  {% set ns.msg = ns.msg + state.attributes.friendly_name + ': Unavailable\n' %}
+                {% elif state.state | int(0) <= 30 and state.state | int(0) > 0 %}
+                  {% set ns.msg = ns.msg + state.attributes.friendly_name + ': ' + state.state + '%\n' %}
+                {% endif %}
               {% endif %}
             {% endfor %}
-            {% if ns.msg == '' %}All batteries above 30%{% else %}{{ ns.msg }}{% endif %}
+            {% if ns.msg == '' %}All batteries above 30% and online{% else %}{{ ns.msg }}{% endif %}
 
   update_battery_status:
     alias: "Update Battery Status"
@@ -40,35 +53,38 @@ script:
         data:
           value: >
             {% set battery_sensors = [
-              states('sensor.back_yard_garage_battery'),
-              states('sensor.front_door_battery'),
-              states('sensor.basement_humidity_sensor_battery'),
-              states('sensor.basement_smoke_co_battery'),
-              states('sensor.south_bedroom_smoke_alarm_battery'),
-              states('sensor.den_smoke_alarm_battery'),
-              states('sensor.dining_room_smoke_co_alarm_battery'),
-              states('sensor.fire_co_alarm_battery'),
-              states('sensor.garage_entry_door_battery'),
-              states('sensor.garage_freezer_temp_battery'),
-              states('sensor.garage_fridge_temp_battery'),
-              states('sensor.garage_motion_sensor_battery'),
-              states('sensor.garage_smoke_alarm_battery'),
-              states('sensor.kitchen_freezer_temp_battery'),
-              states('sensor.kitchen_fridge_temp_battery'),
-              states('sensor.laundry_temp_humidity_sensor_battery'),
-              states('sensor.master_bath_temp_humidity_sensor_battery'),
-              states('sensor.master_bedroom_smoke_co_alarm_battery'),
-              states('sensor.office_smoke_alarm_battery'),
-              states('sensor.sarah_bedroom_smoke_alarm_battery'),
-              states('sensor.sump_pump_depth_alert_battery'),
-              states('sensor.hot_water_heater_leak_sensor_battery'),
-              states('sensor.sump_leak_sensor_battery'),
-              states('sensor.sump_pump_running_battery'),
-              states('sensor.well_leak_sensor_battery')
+              'sensor.back_yard_garage_battery',
+              'sensor.front_door_battery',
+              'sensor.basement_humidity_sensor_battery',
+              'sensor.basement_smoke_co_battery',
+              'sensor.south_bedroom_smoke_alarm_battery',
+              'sensor.den_smoke_alarm_battery',
+              'sensor.dining_room_smoke_co_alarm_battery',
+              'sensor.fire_co_alarm_battery',
+              'sensor.garage_entry_door_battery',
+              'sensor.garage_freezer_temp_battery',
+              'sensor.garage_fridge_temp_battery',
+              'sensor.garage_motion_sensor_battery',
+              'sensor.garage_smoke_alarm_battery',
+              'sensor.kitchen_freezer_temp_battery',
+              'sensor.kitchen_fridge_temp_battery',
+              'sensor.laundry_temp_humidity_sensor_battery',
+              'sensor.master_bath_temp_humidity_sensor_battery',
+              'sensor.master_bedroom_smoke_co_alarm_battery',
+              'sensor.office_smoke_alarm_battery',
+              'sensor.sarah_bedroom_smoke_alarm_battery',
+              'sensor.sump_pump_depth_alert_battery',
+              'sensor.hot_water_heater_leak_sensor_battery',
+              'sensor.sump_leak_sensor_battery',
+              'sensor.sump_pump_running_battery',
+              'sensor.well_leak_sensor_battery'
             ] %}
-            {% set critical = battery_sensors | select('is_number') | map('int') | select('lt', 15) | list | length > 0 %}
-            {% set low = battery_sensors | select('is_number') | map('int') | select('lt', 30) | list | length > 0 %}
-            {% if critical %}
+            {% set unavailable = battery_sensors | select('is_state', 'unavailable') | list | length > 0 %}
+            {% set critical = battery_sensors | reject('is_state', 'unavailable') | map('states') | select('is_number') | map('int') | select('lt', 15) | list | length > 0 %}
+            {% set low = battery_sensors | reject('is_state', 'unavailable') | map('states') | select('is_number') | map('int') | select('lt', 30) | list | length > 0 %}
+            {% if unavailable %}
+              Offline
+            {% elif critical %}
               Critical
             {% elif low %}
               Low
@@ -80,6 +96,105 @@ script:
 # Automations
 # --------------------------------------------------
 automation:
+  # =============================================================================
+  # SENSOR UNAVAILABLE ALERT
+  # Fires when any battery sensor goes unavailable for 10+ minutes.
+  # Identifies the specific device by friendly name.
+  # =============================================================================
+  - id: battery_sensor_unavailable
+    alias: "Battery - Sensor Unavailable"
+    description: "Alert when a battery sensor goes offline — likely dead battery"
+    mode: parallel
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.back_yard_garage_battery
+          - sensor.front_door_battery
+          - sensor.basement_humidity_sensor_battery
+          - sensor.basement_smoke_co_battery
+          - sensor.south_bedroom_smoke_alarm_battery
+          - sensor.den_smoke_alarm_battery
+          - sensor.dining_room_smoke_co_alarm_battery
+          - sensor.fire_co_alarm_battery
+          - sensor.garage_entry_door_battery
+          - sensor.garage_freezer_temp_battery
+          - sensor.garage_fridge_temp_battery
+          - sensor.garage_motion_sensor_battery
+          - sensor.garage_smoke_alarm_battery
+          - sensor.kitchen_freezer_temp_battery
+          - sensor.kitchen_fridge_temp_battery
+          - sensor.laundry_temp_humidity_sensor_battery
+          - sensor.master_bath_temp_humidity_sensor_battery
+          - sensor.master_bedroom_smoke_co_alarm_battery
+          - sensor.office_smoke_alarm_battery
+          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.sump_pump_depth_alert_battery
+          - sensor.hot_water_heater_leak_sensor_battery
+          - sensor.sump_leak_sensor_battery
+          - sensor.sump_pump_running_battery
+          - sensor.well_leak_sensor_battery
+        to: "unavailable"
+        for:
+          minutes: 10
+    action:
+      - service: notify.house_notices
+        data:
+          title: "Battery Sensor Offline"
+          message: |
+            Device: {{ state_attr(trigger.entity_id, 'friendly_name') }}
+            Status: Unavailable (10+ min)
+            Check sensor — likely dead battery
+      - service: script.update_battery_status
+
+  # =============================================================================
+  # SENSOR RECOVERY
+  # Clears status when a previously unavailable sensor comes back online.
+  # =============================================================================
+  - id: battery_sensor_recovery
+    alias: "Battery - Sensor Recovery"
+    description: "Update status when a battery sensor comes back online"
+    mode: parallel
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.back_yard_garage_battery
+          - sensor.front_door_battery
+          - sensor.basement_humidity_sensor_battery
+          - sensor.basement_smoke_co_battery
+          - sensor.south_bedroom_smoke_alarm_battery
+          - sensor.den_smoke_alarm_battery
+          - sensor.dining_room_smoke_co_alarm_battery
+          - sensor.fire_co_alarm_battery
+          - sensor.garage_entry_door_battery
+          - sensor.garage_freezer_temp_battery
+          - sensor.garage_fridge_temp_battery
+          - sensor.garage_motion_sensor_battery
+          - sensor.garage_smoke_alarm_battery
+          - sensor.kitchen_freezer_temp_battery
+          - sensor.kitchen_fridge_temp_battery
+          - sensor.laundry_temp_humidity_sensor_battery
+          - sensor.master_bath_temp_humidity_sensor_battery
+          - sensor.master_bedroom_smoke_co_alarm_battery
+          - sensor.office_smoke_alarm_battery
+          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.sump_pump_depth_alert_battery
+          - sensor.hot_water_heater_leak_sensor_battery
+          - sensor.sump_leak_sensor_battery
+          - sensor.sump_pump_running_battery
+          - sensor.well_leak_sensor_battery
+        from: "unavailable"
+        for:
+          minutes: 2
+    action:
+      - service: notify.operational_log
+        data:
+          title: "Battery Sensor Recovered"
+          message: |
+            Device: {{ state_attr(trigger.entity_id, 'friendly_name') }}
+            Battery: {{ states(trigger.entity_id) }}%
+            Status: Back online
+      - service: script.update_battery_status
+
   # =============================================================================
   # 30% LOW BATTERY WARNING (Normal Priority)
   # =============================================================================
@@ -119,7 +234,6 @@ automation:
         for:
           minutes: 5
     condition:
-      # Only alert if battery is above 15% (to avoid duplicate with critical alert)
       - condition: template
         value_template: "{{ trigger.to_state.state | int(0) > 15 }}"
     action:
@@ -183,13 +297,13 @@ automation:
       - service: script.update_battery_status
 
   # =============================================================================
-  # DAILY BATTERY STATUS UPDATE
+  # DAILY BATTERY STATUS UPDATE — 23:55
   # =============================================================================
   - id: battery_status_daily_update
     alias: "Battery - Daily Status Update"
-    description: "Update battery status helper every morning"
+    description: "Update battery status helper at end of day with other reports"
     trigger:
       - platform: time
-        at: "08:00:00"
+        at: "23:55:00"
     action:
       - service: script.update_battery_status
