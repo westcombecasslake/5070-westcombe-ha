@@ -9,7 +9,7 @@
 # --------------------------------------------------
 # Integration Status Helpers (Android Auto display)
 # Set by offline/recovery automations below.
-# Combined integrations_status reflects all four.
+# Combined integrations_status reflects all five.
 # --------------------------------------------------
 input_text:
   insteon_status:
@@ -26,6 +26,10 @@ input_text:
 
   ring_status:
     name: "Ring Status"
+    initial: "Online"
+
+  matter_status:
+    name: "Matter/Thread Status"
     initial: "Online"
 
   integrations_status:
@@ -49,6 +53,9 @@ template:
 
       - name: "Ring Status"
         state: "{{ states('input_text.ring_status') }}"
+
+      - name: "Matter/Thread Status"
+        state: "{{ states('input_text.matter_status') }}"
 
       - name: "Integrations Status"
         state: "{{ states('input_text.integrations_status') }}"
@@ -242,9 +249,55 @@ automation:
           value: "Online"
 
   # --------------------------------------------------
+  # Matter/Thread - OFFLINE Detection
+  # Monitors Eve Energy outlet (Thread router) as proxy
+  # for Matter/Thread network health.
+  # --------------------------------------------------
+  - id: system_health_matter_offline
+    alias: "System Health - Matter/Thread Offline"
+    trigger:
+      - platform: state
+        entity_id: sensor.master_bedroom_outlet_thread_router_power_top
+        to: "unavailable"
+        for: "00:10:00"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.matter_status
+        data:
+          value: "Offline"
+      - service: notify.house_alerts
+        data:
+          title: "Matter/Thread Offline"
+          message: |
+            Status: Offline (10+ minutes)
+            Action Required: Check ZBT-2 and Matter integration
+
+  # --------------------------------------------------
+  # Matter/Thread - ONLINE Recovery
+  # --------------------------------------------------
+  - id: system_health_matter_online
+    alias: "System Health - Matter/Thread Online"
+    trigger:
+      - platform: state
+        entity_id: sensor.master_bedroom_outlet_thread_router_power_top
+        from: "unavailable"
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_text.matter_status
+        state: "Offline"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.matter_status
+        data:
+          value: "Online"
+
+  # --------------------------------------------------
   # Overall Integration Status
   # Triggered whenever any individual status changes.
-  # Shows "Normal" when all four are Online, else "Problem".
+  # Shows "Normal" when all five are Online, else "Problem".
   # --------------------------------------------------
   - id: system_health_integrations_status_update
     alias: "System Health - Update Overall Integrations Status"
@@ -255,6 +308,7 @@ automation:
           - input_text.yolink_status
           - input_text.ecobee_status
           - input_text.ring_status
+          - input_text.matter_status
     action:
       - service: input_text.set_value
         target:
@@ -264,7 +318,8 @@ automation:
             {% if is_state('input_text.insteon_status', 'Online') and
                   is_state('input_text.yolink_status', 'Online') and
                   is_state('input_text.ecobee_status', 'Online') and
-                  is_state('input_text.ring_status', 'Online') %}
+                  is_state('input_text.ring_status', 'Online') and
+                  is_state('input_text.matter_status', 'Online') %}
               Normal
             {% else %}
               Problem

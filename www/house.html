@@ -71,6 +71,7 @@
   .section-label { font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; margin-top: 24px; padding-left: 2px; }
 
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }
   .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; position: relative; overflow: hidden; transition: background 0.3s, border-color 0.3s; }
@@ -114,8 +115,8 @@
   // ============================================================
   // CONFIGURATION — update these two values
   // ============================================================
-  const HA_URL   = "https://45yt8uxuisvmflbjzkczr77kr1jum1m0.ui.nabu.casa";
-  const HA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzY2U3OWJjYTQxOTI0YTNjYjM3ODM0ODlmZTBhMmI3MiIsImlhdCI6MTc3MjM5ODMwNywiZXhwIjoyMDg3NzU4MzA3fQ.UyfL-yfcrwXyA0tLisX9GkSdJ8o8FUfRGk5NEEsAq0s";
+const HA_URL   = "https://45yt8uxuisvmflbjzkczr77kr1jum1m0.ui.nabu.casa";
+const HA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzY2U3OWJjYTQxOTI0YTNjYjM3ODM0ODlmZTBhMmI3MiIsImlhdCI6MTc3MjM5ODMwNywiZXhwIjoyMDg3NzU4MzA3fQ.UyfL-yfcrwXyA0tLisX9GkSdJ8o8FUfRGk5NEEsAq0s";
   const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
   // ============================================================
 
@@ -147,6 +148,7 @@
     "sensor.master_bedroom_co2",
     "sensor.master_bedroom_pm25",
     "input_text.pm25_status",
+    "input_text.matter_status",
   ];
 
   async function fetchStates() {
@@ -181,6 +183,7 @@
     if (type === "battery") {
       if (value.trim().toLowerCase() === "critical") return "alert";
       if (value.trim().toLowerCase() === "low") return "warn";
+      if (value.trim().toLowerCase() === "offline") return "warn";
       return "ok";
     }
     if (type === "fridge") {
@@ -254,7 +257,7 @@
 
   function formatTemp(val) {
     const n = parseFloat(val);
-    return isNaN(n) ? "—" : `${n}°F`;
+    return isNaN(n) ? "—" : `${n.toFixed(1)}°F`;
   }
 
   function formatCO2(val) {
@@ -294,6 +297,9 @@
         s["input_text.ecobee_status"]?.trim());
       setCard("card-ring", s["input_text.ring_status"], "integration",
         s["input_text.ring_status"]?.trim());
+
+      setCard("card-matter", s["input_text.matter_status"], "integration",
+        s["input_text.matter_status"]?.trim());
 
       // Safety
       const smokeOnline = s["input_text.smoke_co_online_status"] || "";
@@ -369,6 +375,18 @@
   }
 
   // Wait for DOM before starting
+  async function runBatteryReport() {
+    try {
+      await fetch(HA_URL + "/api/services/script/battery_status_report", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + HA_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+    } catch(e) {
+      console.error("Battery report failed:", e);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     setInterval(updateClock, 1000);
@@ -402,11 +420,12 @@
 
 <!-- Integrations -->
 <div class="section-label">Integrations</div>
-<div class="grid-4">
+<div class="grid-5">
   <div id="card-insteon" class="card neutral"><div class="card-label">Insteon</div><div class="card-value">—</div></div>
   <div id="card-yolink" class="card neutral"><div class="card-label">YoLink</div><div class="card-value">—</div></div>
   <div id="card-ecobee" class="card neutral"><div class="card-label">Ecobee</div><div class="card-value">—</div></div>
   <div id="card-ring" class="card neutral"><div class="card-label">Ring</div><div class="card-value">—</div></div>
+  <div id="card-matter" class="card neutral"><div class="card-label">Matter/Thread</div><div class="card-value">—</div></div>
 </div>
 
 <!-- Safety -->
@@ -414,7 +433,7 @@
 <div class="grid-3">
   <div id="card-smoke-online" class="card neutral"><div class="card-label">Smoke/CO Detectors</div><div class="card-value">—</div></div>
   <div id="card-smoke-alert" class="card neutral"><div class="card-label">Smoke/CO Alert</div><div class="card-value">—</div></div>
-  <div id="card-battery" class="card neutral"><div class="card-label">Batteries</div><div class="card-value">—</div></div>
+  <div id="card-battery" class="card neutral"><div class="card-label">Batteries</div><div class="card-value">—</div><button onclick="runBatteryReport()" style="margin-top:10px;font-size:10px;font-family:DM Mono,monospace;background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:5px;padding:4px 8px;cursor:pointer;width:100%;">Run Report</button></div>
 </div>
 
 <!-- Appliances -->
