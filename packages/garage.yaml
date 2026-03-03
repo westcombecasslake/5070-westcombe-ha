@@ -3,9 +3,10 @@
 ###############################################################################
 #
 # PURPOSE:
-# Two independent functions:
+# Three independent functions:
 # - Motion/door-activated lighting via Insteon Scene 20
 # - Freezing temperature alerts using YoLink smoke/CO sensor thermometer
+# - Away mode sensor monitoring with Pushover alerts via House Alerts
 #
 # MOTION/DOOR LIGHTING:
 # - YoLink motion sensor or door sensors trigger Scene 20 (double-send for reliability)
@@ -16,7 +17,40 @@
 # - Repeats every 2 hours while condition persists
 # - Uses temperature from garage YoLink smoke/CO detector
 #
+# AWAY MONITORING:
+# - Active only when input_boolean.vacation_mode is on
+# - First sensor trigger sends immediate Pushover alert
+# - Additional triggers are counted and summarized every 30 minutes
+# - Loop exits if no new activity for 1.5 hours, then resets
+# - All state resets automatically when vacation mode is turned off
+#
 ###############################################################################
+
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
+input_boolean:
+  vacation_mode:
+    name: "Vacation Mode"
+    icon: mdi:airplane
+
+  garage_away_alert_active:
+    name: "Garage Away Alert Active"
+
+input_number:
+  garage_away_trigger_count:
+    name: "Garage Away Trigger Count"
+    min: 0
+    max: 999
+    step: 1
+    mode: box
+
+input_datetime:
+  garage_away_last_trigger:
+    name: "Garage Away Last Trigger"
+    has_date: true
+    has_time: true
+
 
 automation:
   # --------------------------------------------------
@@ -57,6 +91,7 @@ automation:
         data:
           group: 20
 
+
   # --------------------------------------------------
   # Garage Below Freezing Alert (Repeating)
   #
@@ -85,6 +120,148 @@ automation:
                 title: "Garage Below Freezing"
                 message: |
                   Garage temperature: {{ states('sensor.garage_smoke_alarm_temperature') }}F
-                  
+
                   Risk of pipe freeze. Take action to warm garage or insulate pipes.
             - delay: "02:00:00"
+
+
+  # --------------------------------------------------
+  # Garage Away Monitoring - Sensor Trigger
+  #
+  # Fires on any sensor while vacation mode is on.
+  # First trigger: sends immediate alert and arms the session.
+  # Subsequent triggers: increments counter and stamps the time.
+  # --------------------------------------------------
+  - id: garage_away_sensor_trigger
+    alias: "Garage - Away Mode Sensor Trigger"
+    mode: queued
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.garage_motion
+          - binary_sensor.back_yard_garage
+          - binary_sensor.entry_door_garage
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.vacation_mode
+        state: "on"
+    action:
+      # Always stamp the last trigger time
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.garage_away_last_trigger
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.garage_away_alert_active
+                state: "off"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.garage_away_alert_active
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.garage_away_trigger_count
+                data:
+                  value: 0
+              - service: notify.house_alerts
+                data:
+                  title: "Garage Activity While Away"
+                  message: >
+                    {{ trigger.to_state.attributes.friendly_name }} detected activity
+                    while in Vacation mode.
+        default:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.garage_away_trigger_count
+            data:
+              value: "{{ (states('input_number.garage_away_trigger_count') | int) + 1 }}"
+
+
+  # --------------------------------------------------
+  # Garage Away Monitoring - 30-Minute Summary Loop
+  #
+  # Starts when the session is armed.
+  # Every 30 minutes:
+  #   - If no activity for 1.5 hours: exit and reset
+  #   - If counter > 0: send summary and reset counter
+  #   - If counter = 0: stay quiet, keep looping
+  # --------------------------------------------------
+  - id: garage_away_summary_loop
+    alias: "Garage - Away Mode Summary Loop"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.garage_away_alert_active
+        to: "on"
+    action:
+      - repeat:
+          while:
+            - condition: state
+              entity_id: input_boolean.garage_away_alert_active
+              state: "on"
+            - condition: state
+              entity_id: input_boolean.vacation_mode
+              state: "on"
+          sequence:
+            - delay: "00:30:00"
+
+            # If 1.5 hours since last trigger, exit and reset.
+            # Otherwise send summary only if counter > 0.
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: >
+                        {{ (now() - states('input_datetime.garage_away_last_trigger') | as_datetime).total_seconds() > 5400 }}
+                  sequence:
+                    - service: input_boolean.turn_off
+                      target:
+                        entity_id: input_boolean.garage_away_alert_active
+                    - service: input_number.set_value
+                      target:
+                        entity_id: input_number.garage_away_trigger_count
+                      data:
+                        value: 0
+                - conditions:
+                    - condition: template
+                      value_template: "{{ states('input_number.garage_away_trigger_count') | int > 0 }}"
+                  sequence:
+                    - service: notify.house_alerts
+                      data:
+                        title: "Garage Activity Update"
+                        message: >
+                          {{ states('input_number.garage_away_trigger_count') | int }} additional
+                          detection(s) in the last 30 minutes while Away.
+                    - service: input_number.set_value
+                      target:
+                        entity_id: input_number.garage_away_trigger_count
+                      data:
+                        value: 0
+
+
+  # --------------------------------------------------
+  # Garage Away Monitoring - Reset on Vacation Mode Off
+  #
+  # Cleans up all state when vacation mode is turned off
+  # so the next trip starts fresh.
+  # --------------------------------------------------
+  - id: garage_away_reset_on_exit
+    alias: "Garage - Reset Away Alert on Vacation Mode Off"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.vacation_mode
+        to: "off"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.garage_away_alert_active
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.garage_away_trigger_count
+        data:
+          value: 0

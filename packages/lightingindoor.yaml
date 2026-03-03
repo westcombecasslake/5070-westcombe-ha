@@ -24,15 +24,15 @@
 #    Uses Scene 31 OFF to slowly fade lamps off instead of abrupt shutoff
 #
 # 4. Living Room Lamps -- Away Mode Weekday Morning (Scene 24)
-#    Random activation 5:27-6:48 AM Monday-Friday when in away mode
+#    Random activation 5:27-6:48 AM Monday-Friday when vacation mode is on
 #    Simulates occupancy for security when house is unoccupied
 #
 # 5. Living Room Lamps -- Away Mode Weekend Morning (Scene 24)
-#    Random activation 7:13-7:58 AM Saturday-Sunday when in away mode
+#    Random activation 7:13-7:58 AM Saturday-Sunday when vacation mode is on
 #    Simulates occupancy for security when house is unoccupied
 #
 # 6. Master Bedroom -- Away Mode Evening Simulation (Scene 30)
-#    Random activation 9:22-9:34 PM daily when in away mode
+#    Random activation 9:22-9:34 PM daily when vacation mode is on
 #    Lights on for 17-26 minutes to simulate evening bedroom activity
 #    Automatically turns off after duration for security appearance
 #
@@ -67,8 +67,8 @@
 # - binary_sensor.main_floor_occupancy (ecobee thermostat - living room & seasonal)
 # - binary_sensor.master_bedroom_occupancy (bedroom)
 #
-# ECOBEE MODE:
-# - select.main_floor_current_mode (thermostat mode for away detection)
+# AWAY MODE:
+# - input_boolean.vacation_mode (declared in garage.yaml)
 #
 # DUSK SENSOR:
 # - switch.photocell_micro_module (indoor photocell for dawn/dusk detection)
@@ -158,7 +158,7 @@ automation:
   #############################################################################
   # LIVING ROOM LAMPS -- AWAY MODE MORNING ON (SCENE 24)
   # Weekday: Random 5:27-6:48 AM, Weekend: Random 7:13-7:58 AM
-  # Simulates occupancy when house is in away mode
+  # Simulates occupancy when vacation mode is on
   #############################################################################
 
   - id: living_room_lamps_away_weekday
@@ -168,8 +168,8 @@ automation:
         at: "05:27:00"
     condition:
       - condition: state
-        entity_id: select.main_floor_current_mode
-        state: "away"
+        entity_id: input_boolean.vacation_mode
+        state: "on"
       - condition: time
         weekday:
           - mon
@@ -197,8 +197,8 @@ automation:
         at: "07:13:00"
     condition:
       - condition: state
-        entity_id: select.main_floor_current_mode
-        state: "away"
+        entity_id: input_boolean.vacation_mode
+        state: "on"
       - condition: time
         weekday:
           - sat
@@ -219,7 +219,7 @@ automation:
   #############################################################################
   # MASTER BEDROOM -- AWAY MODE EVENING ON/OFF (SCENE 30)
   # Random start 9:22-9:34 PM, on for 17-26 minutes
-  # Simulates evening bedroom activity when house is in away mode
+  # Simulates evening bedroom activity when vacation mode is on
   #############################################################################
 
   - id: master_bedroom_away_evening
@@ -229,8 +229,8 @@ automation:
         at: "21:22:00"
     condition:
       - condition: state
-        entity_id: select.main_floor_current_mode
-        state: "away"
+        entity_id: input_boolean.vacation_mode
+        state: "on"
     action:
       - delay:
           minutes: "{{ range(0, 13) | random }}"
