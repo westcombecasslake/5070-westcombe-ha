@@ -143,6 +143,10 @@ automation:
       - platform: state
         entity_id: switch.photocell_micro_module
         to: "off"
+    condition:
+      - condition: time
+        after: "05:00:00"
+        before: "10:00:00"
     action:
       - delay: "00:35:00"
       # Double-send: Ensures morning fade-off of lamps if manually left on
