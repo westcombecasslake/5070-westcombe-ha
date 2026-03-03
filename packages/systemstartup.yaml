@@ -15,8 +15,11 @@
 # - Smoke/CO alert status (checks for active alerts)
 # - Integration statuses reset to Online (offline automations re-fire if needed)
 #
+# ALPSTUGA SCREENS:
+# - Screens reset to ON after power loss; turned off on every restart
+# - Extra delay allows Matter/Thread devices time to fully reconnect
+#
 ###############################################################################
-
 automation:
   - id: system_startup_notification
     alias: "System - Startup Notification & Status Refresh"
@@ -29,15 +32,12 @@ automation:
         data:
           title: "Home Assistant Restarted"
           message: "System restarted at {{ now().strftime('%I:%M %p on %B %d, %Y') }}"
-
       # Wait 30 seconds for integrations to initialize
       - delay: "00:00:30"
-
       # Refresh script-based status helpers
       - service: script.update_battery_status
       - service: script.update_smoke_co_online_status
       - service: script.update_smoke_co_alert_status
-
       # Reset integration status helpers to Online on restart.
       # Integrations re-initialize after startup; the offline detection
       # automations in systemhealth.yaml will fire again if any integration
@@ -67,3 +67,11 @@ automation:
           entity_id: input_text.integrations_status
         data:
           value: "Normal"
+      # Additional delay for Matter/Thread devices to fully reconnect
+      - delay: "00:00:30"
+      # Turn off Alpstuga air quality monitor screens (reset to ON after power loss)
+      - service: switch.turn_off
+        target:
+          entity_id:
+            - switch.dinning_air_quality_screen
+            - switch.master_bedroom_air_quality_screen
