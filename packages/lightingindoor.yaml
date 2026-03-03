@@ -91,7 +91,7 @@ automation:
     trigger:
       - platform: sun
         event: sunset
-        offset: "-00:40:00"
+        offset: "-00:50:00"
     action:
       # Double-send: Ensures sunset-triggered ambient lighting activation
       # for gradual transition to evening lighting

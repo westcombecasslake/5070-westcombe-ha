@@ -21,8 +21,9 @@
 # - Allowed: All other times including full weekends
 #
 # NOTIFICATIONS:
-# - Operational log on turn-on (humidity exceeded 50%)
-# - Operational log on turn-off (humidity below 45% or peak hour shutoff)
+# - Operational log on turn-on (humidity exceeded 50%, outside peak hours)
+# - Operational log on turn-off (humidity dropped below 45%)
+# - No notification for peak hour shutoff (3 PM Mon-Fri)
 #
 ###############################################################################
 
@@ -97,26 +98,12 @@ automation:
       - service: switch.turn_off
         target:
           entity_id: switch.scheduled_power_save
-      - choose:
-          - conditions:
-              - condition: trigger
-                id: humidity_trigger
-            sequence:
-              - service: notify.operational_log
-                data:
-                  title: "Basement Dehumidifier - Normal"
-                  message: |
-                    Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
-                    Threshold: 45% (OFF)
-                    Status: Dehumidifier deactivated
-          - conditions:
-              - condition: trigger
-                id: time_trigger
-            sequence:
-              - service: notify.operational_log
-                data:
-                  title: "Basement Dehumidifier - Peak Hours"
-                  message: |
-                    Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
-                    Status: Dehumidifier shut off for peak rate period (3-7 PM)
-                    Resumes: After 7:00 PM
+      - condition: trigger
+        id: humidity_trigger
+      - service: notify.operational_log
+        data:
+          title: "Basement Dehumidifier - Normal"
+          message: |
+            Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
+            Threshold: 45% (OFF)
+            Status: Dehumidifier deactivated
