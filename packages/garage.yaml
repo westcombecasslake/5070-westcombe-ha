@@ -18,11 +18,17 @@
 # - Uses temperature from garage YoLink smoke/CO detector
 #
 # AWAY MONITORING:
-# - Active only when input_boolean.vacation_mode is on
+# - Active only when input_boolean.house_unoccupied is on
+# - house_unoccupied set automatically after 8h no motion on main floor ecobee
 # - First sensor trigger sends immediate Pushover alert
 # - Additional triggers are counted and summarized every 30 minutes
 # - Loop exits if no new activity for 1.5 hours, then resets
-# - All state resets automatically when vacation mode is turned off
+# - All state resets automatically when occupancy returns
+#
+# OCCUPANCY DETECTION:
+# - house_unoccupied: set ON after 8h no motion (main floor ecobee)
+# - long_term_away:   set ON after 24h no motion (used by lighting simulations)
+# - Both cleared immediately when motion returns
 #
 ###############################################################################
 
@@ -30,9 +36,13 @@
 # Helpers
 # --------------------------------------------------
 input_boolean:
-  vacation_mode:
-    name: "Vacation Mode"
-    icon: mdi:airplane
+  house_unoccupied:
+    name: "House Unoccupied"
+    icon: mdi:home-outline
+
+  long_term_away:
+    name: "Long Term Away"
+    icon: mdi:home-export-outline
 
   garage_away_alert_active:
     name: "Garage Away Alert Active"
@@ -51,8 +61,56 @@ input_datetime:
     has_date: true
     has_time: true
 
-
 automation:
+  ###############################################################################
+  # OCCUPANCY TRACKING
+  #
+  # Uses main floor ecobee motion sensor as sole source of truth.
+  # house_unoccupied: ON after 8h no motion  (garage monitoring, seasonal lighting)
+  # long_term_away:   ON after 24h no motion (lighting simulations)
+  # Both cleared immediately on any motion detection.
+  ###############################################################################
+
+  - id: occupancy_set_house_unoccupied
+    alias: "Occupancy -- Set House Unoccupied After 8h No Motion"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.main_floor_occupancy
+        to: "off"
+        for: "08:00:00"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.house_unoccupied
+
+  - id: occupancy_set_long_term_away
+    alias: "Occupancy -- Set Long Term Away After 24h No Motion"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.main_floor_occupancy
+        to: "off"
+        for: "24:00:00"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.long_term_away
+
+  - id: occupancy_clear_on_motion
+    alias: "Occupancy -- Clear Away Flags on Motion"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.main_floor_occupancy
+        to: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.house_unoccupied
+            - input_boolean.long_term_away
+
   # --------------------------------------------------
   # Garage Lights via Motion/Door - Insteon Scene 20
   #
@@ -91,7 +149,6 @@ automation:
         data:
           group: 20
 
-
   # --------------------------------------------------
   # Garage Below Freezing Alert (Repeating)
   #
@@ -124,11 +181,10 @@ automation:
                   Risk of pipe freeze. Take action to warm garage or insulate pipes.
             - delay: "02:00:00"
 
-
   # --------------------------------------------------
   # Garage Away Monitoring - Sensor Trigger
   #
-  # Fires on any sensor while vacation mode is on.
+  # Fires on any sensor while house_unoccupied is on.
   # First trigger: sends immediate alert and arms the session.
   # Subsequent triggers: increments counter and stamps the time.
   # --------------------------------------------------
@@ -144,7 +200,7 @@ automation:
         to: "on"
     condition:
       - condition: state
-        entity_id: input_boolean.vacation_mode
+        entity_id: input_boolean.house_unoccupied
         state: "on"
     action:
       # Always stamp the last trigger time
@@ -173,14 +229,13 @@ automation:
                   title: "Garage Activity While Away"
                   message: >
                     {{ trigger.to_state.attributes.friendly_name }} detected activity
-                    while in Vacation mode.
+                    while house is unoccupied.
         default:
           - service: input_number.set_value
             target:
               entity_id: input_number.garage_away_trigger_count
             data:
               value: "{{ (states('input_number.garage_away_trigger_count') | int) + 1 }}"
-
 
   # --------------------------------------------------
   # Garage Away Monitoring - 30-Minute Summary Loop
@@ -205,7 +260,7 @@ automation:
               entity_id: input_boolean.garage_away_alert_active
               state: "on"
             - condition: state
-              entity_id: input_boolean.vacation_mode
+              entity_id: input_boolean.house_unoccupied
               state: "on"
           sequence:
             - delay: "00:30:00"
@@ -235,26 +290,25 @@ automation:
                         title: "Garage Activity Update"
                         message: >
                           {{ states('input_number.garage_away_trigger_count') | int }} additional
-                          detection(s) in the last 30 minutes while Away.
+                          detection(s) in the last 30 minutes while away.
                     - service: input_number.set_value
                       target:
                         entity_id: input_number.garage_away_trigger_count
                       data:
                         value: 0
 
-
   # --------------------------------------------------
-  # Garage Away Monitoring - Reset on Vacation Mode Off
+  # Garage Away Monitoring - Reset When Occupancy Returns
   #
-  # Cleans up all state when vacation mode is turned off
-  # so the next trip starts fresh.
+  # Cleans up garage alert state when house_unoccupied turns off
+  # (i.e. motion detected after absence) so next absence starts fresh.
   # --------------------------------------------------
-  - id: garage_away_reset_on_exit
-    alias: "Garage - Reset Away Alert on Vacation Mode Off"
+  - id: garage_away_reset_on_return
+    alias: "Garage - Reset Away Alert on Occupancy Return"
     mode: single
     trigger:
       - platform: state
-        entity_id: input_boolean.vacation_mode
+        entity_id: input_boolean.house_unoccupied
         to: "off"
     action:
       - service: input_boolean.turn_off

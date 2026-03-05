@@ -24,15 +24,15 @@
 #    Uses Scene 31 OFF to slowly fade lamps off instead of abrupt shutoff
 #
 # 4. Living Room Lamps -- Away Mode Weekday Morning (Scene 24)
-#    Random activation 5:27-6:48 AM Monday-Friday when vacation mode is on
-#    Simulates occupancy for security when house is unoccupied
+#    Random activation 5:27-6:48 AM Monday-Friday when long_term_away is on
+#    Simulates occupancy for security when house has been unoccupied 24+ hours
 #
 # 5. Living Room Lamps -- Away Mode Weekend Morning (Scene 24)
-#    Random activation 7:13-7:58 AM Saturday-Sunday when vacation mode is on
-#    Simulates occupancy for security when house is unoccupied
+#    Random activation 7:13-7:58 AM Saturday-Sunday when long_term_away is on
+#    Simulates occupancy for security when house has been unoccupied 24+ hours
 #
 # 6. Master Bedroom -- Away Mode Evening Simulation (Scene 30)
-#    Random activation 9:22-9:34 PM daily when vacation mode is on
+#    Random activation 9:22-9:34 PM daily when long_term_away is on
 #    Lights on for 17-26 minutes to simulate evening bedroom activity
 #    Automatically turns off after duration for security appearance
 #
@@ -67,8 +67,9 @@
 # - binary_sensor.main_floor_occupancy (ecobee thermostat - living room & seasonal)
 # - binary_sensor.master_bedroom_occupancy (bedroom)
 #
-# AWAY MODE:
-# - input_boolean.vacation_mode (declared in garage.yaml)
+# AWAY FLAGS (declared in garage.yaml):
+# - input_boolean.house_unoccupied  -- 8h no motion  (garage monitoring)
+# - input_boolean.long_term_away    -- 24h no motion (lighting simulations)
 #
 # DUSK SENSOR:
 # - switch.photocell_micro_module (indoor photocell for dawn/dusk detection)
@@ -92,6 +93,13 @@ automation:
       - platform: sun
         event: sunset
         offset: "-00:50:00"
+      - platform: state
+        entity_id: switch.photocell_micro_module
+        to: "on"
+    condition:
+      # Time guard: prevents 1 PM daily photocell reset from triggering fade up
+      - condition: time
+        after: "14:00:00"
     action:
       # Double-send: Ensures sunset-triggered ambient lighting activation
       # for gradual transition to evening lighting
@@ -131,7 +139,6 @@ automation:
         data:
           group: 24
 
-
   #############################################################################
   # LIVING ROOM LAMPS -- MORNING OFF (SCENE 31)
   # Fade off 35 minutes after dusk sensor turns off (daylight detected)
@@ -162,7 +169,7 @@ automation:
   #############################################################################
   # LIVING ROOM LAMPS -- AWAY MODE MORNING ON (SCENE 24)
   # Weekday: Random 5:27-6:48 AM, Weekend: Random 7:13-7:58 AM
-  # Simulates occupancy when vacation mode is on
+  # Only runs after 24h no motion (long_term_away)
   #############################################################################
 
   - id: living_room_lamps_away_weekday
@@ -172,7 +179,7 @@ automation:
         at: "05:27:00"
     condition:
       - condition: state
-        entity_id: input_boolean.vacation_mode
+        entity_id: input_boolean.long_term_away
         state: "on"
       - condition: time
         weekday:
@@ -201,7 +208,7 @@ automation:
         at: "07:13:00"
     condition:
       - condition: state
-        entity_id: input_boolean.vacation_mode
+        entity_id: input_boolean.long_term_away
         state: "on"
       - condition: time
         weekday:
@@ -223,7 +230,7 @@ automation:
   #############################################################################
   # MASTER BEDROOM -- AWAY MODE EVENING ON/OFF (SCENE 30)
   # Random start 9:22-9:34 PM, on for 17-26 minutes
-  # Simulates evening bedroom activity when vacation mode is on
+  # Only runs after 24h no motion (long_term_away)
   #############################################################################
 
   - id: master_bedroom_away_evening
@@ -233,7 +240,7 @@ automation:
         at: "21:22:00"
     condition:
       - condition: state
-        entity_id: input_boolean.vacation_mode
+        entity_id: input_boolean.long_term_away
         state: "on"
     action:
       - delay:

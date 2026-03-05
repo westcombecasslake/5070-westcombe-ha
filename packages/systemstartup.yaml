@@ -19,6 +19,14 @@
 # - Screens reset to ON after power loss; turned off on every restart
 # - Extra delay allows Matter/Thread devices time to fully reconnect
 #
+# OCCUPANCY RESTORE:
+# - house_unoccupied and long_term_away booleans lose their pending timers
+#   on restart. This block restores correct state by checking how long
+#   main_floor_occupancy has been off using its last_changed timestamp.
+# - If sensor is currently ON: both booleans cleared (someone is home)
+# - If off 8+ hours: house_unoccupied turned on
+# - If off 24+ hours: long_term_away also turned on
+#
 ###############################################################################
 automation:
   - id: system_startup_notification
@@ -75,3 +83,58 @@ automation:
           entity_id:
             - switch.dinning_air_quality_screen
             - switch.master_bedroom_air_quality_screen
+
+      # ------------------------------------------------------------------
+      # OCCUPANCY BOOLEAN RESTORE
+      #
+      # The 8h/24h for: timers in garage.yaml don't survive restarts.
+      # Restore correct state by calculating elapsed time since
+      # main_floor_occupancy last changed, using recorder last_changed.
+      #
+      # hours_off: how long the sensor has been continuously off.
+      #   If sensor is currently ON, hours_off will be 0 (condition skipped).
+      # ------------------------------------------------------------------
+      - variables:
+          hours_off: >
+            {% set lc = states.binary_sensor.main_floor_occupancy.last_changed %}
+            {% if states('binary_sensor.main_floor_occupancy') == 'off' %}
+              {{ (now() - lc).total_seconds() / 3600 }}
+            {% else %}
+              0
+            {% endif %}
+
+      # If sensor is currently ON: clear both flags (someone is home)
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.main_floor_occupancy
+                state: "on"
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.house_unoccupied
+                    - input_boolean.long_term_away
+
+          # Off 24+ hours: set both flags
+          - conditions:
+              - condition: template
+                value_template: "{{ hours_off >= 24 }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id:
+                    - input_boolean.house_unoccupied
+                    - input_boolean.long_term_away
+
+          # Off 8-24 hours: set house_unoccupied only
+          - conditions:
+              - condition: template
+                value_template: "{{ hours_off >= 8 }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.house_unoccupied
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.long_term_away
