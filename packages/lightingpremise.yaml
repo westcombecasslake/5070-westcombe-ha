@@ -26,6 +26,12 @@
 # in winter (darker at dusk). Delays compensate so lights turn on at consistent
 # darkness level year-round.
 #
+# PHOTOCELL LOGIC (REVERSED):
+# * switch ON  = light (daytime)
+# * switch OFF = dark (nighttime)
+# Dusk = transition ON -> OFF
+# Dawn = transition OFF -> ON
+#
 # NOTIFICATIONS:
 # * Dusk triggered -> Pushover Operational Log
 # * Photocell failure -> Pushover House Alerts
@@ -102,7 +108,9 @@ automation:
   # Runs at 1:00 PM (midday when sensor should be off anyway).
   #
   # PURPOSE: Analog sensors can drift or get confused over time. Daily reset
-  # helps ensure reliable evening triggering.
+  # helps ensure reliable evening triggering. Reset ends with switch OFF
+  # (dark state), but physical sensor immediately reasserts ON (light) since
+  # it's midday. Sensor will then transition OFF at real dusk as expected.
   ###############################################################################
   - id: premise_dusk_sensor_daily_reset
     alias: "Premise Lighting -- Daily Photocell Reset"
@@ -129,6 +137,8 @@ automation:
   # Primary automation that turns on all premise lights at dusk based on
   # photocell sensor with seasonal delay adjustment.
   #
+  # PHOTOCELL: Triggers on OFF (photocell reversed: OFF = dark)
+  #
   # TIME GUARD: Only runs between 3:45 PM and 7:30 PM to prevent false triggers
   # from sensor glitches at other times.
   #
@@ -143,7 +153,7 @@ automation:
     trigger:
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "on"
+        to: "off"
     condition:
       - condition: time
         after: "15:45:00"
@@ -209,7 +219,7 @@ automation:
   # Runs 15 minutes after sunset as a failsafe.
   #
   # CONDITIONS:
-  # * Photocell module is still OFF (should be ON by now if working)
+  # * Photocell module is still ON (should be OFF/dark by now if working)
   # * Premise lights are still OFF (photocell automation didn't run)
   # * Sun is below horizon (it's actually dark)
   #
@@ -223,10 +233,10 @@ automation:
         event: sunset
         offset: "+00:15:00"
     condition:
-      # Photocell should be ON by now but isn't
+      # Photocell should be OFF (dark) by now but is still ON (light) = failure
       - condition: state
         entity_id: switch.photocell_micro_module
-        state: "off"
+        state: "on"
       # Lights are still off
       - condition: state
         entity_id: light.front_porch_override
@@ -262,6 +272,8 @@ automation:
   #
   # Triggers when photocell detects dawn, turns off all premise lighting.
   #
+  # PHOTOCELL: Triggers on ON (photocell reversed: ON = light)
+  #
   # TIME GUARD: Only runs within 1 hour before sunrise to prevent false triggers
   # from sensor glitches during the day or evening.
   #
@@ -274,7 +286,7 @@ automation:
     trigger:
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "off"
+        to: "on"
     condition:
       - condition: sun
         after: sunrise
