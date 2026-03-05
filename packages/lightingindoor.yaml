@@ -19,7 +19,7 @@
 #    2-hour timeout prevents indefinite waiting
 #
 # 3. Living Room Lamps -- Morning Fade Off After Dawn (Scene 31)
-#    Turns off living room lamps 35 minutes after dusk sensor turns ON (light)
+#    Turns off living room lamps 35 minutes after dusk sensor turns off
 #    Catches lamps that were manually turned on and left on overnight
 #    Uses Scene 31 OFF to slowly fade lamps off instead of abrupt shutoff
 #
@@ -70,10 +70,8 @@
 # AWAY MODE:
 # - input_boolean.vacation_mode (declared in garage.yaml)
 #
-# DUSK SENSOR (REVERSED LOGIC):
-# - switch.photocell_micro_module
-# - ON = light (daytime), OFF = dark (nighttime)
-# - Dawn = transition OFF -> ON
+# DUSK SENSOR:
+# - switch.photocell_micro_module (indoor photocell for dawn/dusk detection)
 #
 ###############################################################################
 
@@ -136,8 +134,7 @@ automation:
 
   #############################################################################
   # LIVING ROOM LAMPS -- MORNING OFF (SCENE 31)
-  # Fade off 35 minutes after dusk sensor turns ON (daylight detected)
-  # PHOTOCELL REVERSED: ON = light (dawn), OFF = dark (dusk)
+  # Fade off 35 minutes after dusk sensor turns off (daylight detected)
   #############################################################################
 
   - id: living_room_lamps_morning_fade_off
@@ -145,7 +142,7 @@ automation:
     trigger:
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "on"
+        to: "off"
     condition:
       - condition: time
         after: "05:00:00"
