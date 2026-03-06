@@ -262,11 +262,10 @@ automation:
   #
   # Triggers when photocell detects dawn, turns off all premise lighting.
   #
-  # TIME GUARD: Only runs within 1 hour before sunrise to prevent false triggers
-  # from sensor glitches during the day or evening.
-  #
-  # This sun-based condition is more reliable than a static time window since
-  # sunrise varies throughout the year.
+  # TIME WINDOW: Restricted to 1 hour before sunrise through 2 hours after
+  # sunrise. This prevents evening photocell glitches (clouds, storms) from
+  # triggering a false dawn-off after lights have already turned on for the
+  # night. Only a true morning dawn event falls within this window.
   ###############################################################################
   - id: premise_lights_dawn_off
     alias: "Premise Lighting -- Dawn Off"
@@ -279,6 +278,8 @@ automation:
       - condition: sun
         after: sunrise
         after_offset: "-01:00:00"
+        before: sunrise
+        before_offset: "+02:00:00"
     action:
       # Double-send: Dawn shutoff for energy conservation
       # ensures all exterior lights deactivate reliably

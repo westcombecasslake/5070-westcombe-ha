@@ -2470,7 +2470,7 @@
         "controller": true,
         "high_water_mark": false,
         "bit5": true,
-        "bit4": false,
+        "bit4": true,
         "group": 1,
         "target": "708cc1",
         "data1": 3,
