@@ -35,13 +35,13 @@ automation:
       - platform: homeassistant
         event: start
     action:
+      # Wait 30 seconds for integrations to initialize
+      - delay: "00:00:30"
       # Send restart notification
       - service: notify.house_alerts
         data:
           title: "Home Assistant Restarted"
           message: "System restarted at {{ now().strftime('%I:%M %p on %B %d, %Y') }}"
-      # Wait 30 seconds for integrations to initialize
-      - delay: "00:00:30"
       # Refresh script-based status helpers
       - service: script.update_battery_status
       - service: script.update_smoke_co_online_status
