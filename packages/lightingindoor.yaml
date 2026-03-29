@@ -95,7 +95,7 @@ automation:
         offset: "-00:50:00"
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "on"
+        to: "off"
     condition:
       # Time guard: prevents 1 PM daily photocell reset from triggering fade up
       - condition: time
@@ -139,6 +139,7 @@ automation:
         data:
           group: 24
 
+
   #############################################################################
   # LIVING ROOM LAMPS -- MORNING OFF (SCENE 31)
   # Fade off 35 minutes after dusk sensor turns off (daylight detected)
@@ -149,7 +150,7 @@ automation:
     trigger:
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "off"
+        to: "on"
     condition:
       - condition: time
         after: "05:00:00"

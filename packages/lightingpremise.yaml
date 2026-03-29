@@ -9,7 +9,7 @@
 #
 # KEY FEATURES:
 # * Seasonal photocell delay adjustments (accounts for varying dusk light levels)
-# * Daily photocell sensor reset (prevents analog sensor drift)
+# * Daily dawn sensor reset (prevents analog sensor drift)
 # * Motion-activated front porch override during dark hours
 # * Weekend-aware nighttime shutoff (later on Fri/Sat)
 # * Random delays for security/natural appearance
@@ -96,15 +96,15 @@ input_boolean:
 
 automation:
   ###############################################################################
-  # AUTOMATION: Daily Photocell Sensor Reset
+  # AUTOMATION: Daily Dawn Sensor Reset
   #
-  # Cycles the photocell module daily to clear analog sensor drift/confusion.
-  # Runs at 1:00 PM (midday when sensor should be off anyway).
+  # Cycles the dawn sensor module daily to clear analog sensor drift/confusion.
+  # Runs at 1:00 PM (midday when sensor should be in ON/daylight state).
   #
   # PURPOSE: Analog sensors can drift or get confused over time. Daily reset
-  # helps ensure reliable evening triggering.
+  # helps ensure reliable morning triggering.
   ###############################################################################
-  - id: premise_dusk_sensor_daily_reset
+  - id: premise_dawn_sensor_daily_reset
     alias: "Premise Lighting -- Daily Photocell Reset"
     mode: single
     trigger:
@@ -118,10 +118,6 @@ automation:
       - action: switch.turn_on
         target:
           entity_id: switch.photocell_micro_module
-      - delay: "00:00:05"
-      - action: switch.turn_off
-        target:
-          entity_id: switch.photocell_micro_module
 
   ###############################################################################
   # AUTOMATION: Premise Lights - Dusk On
@@ -129,8 +125,11 @@ automation:
   # Primary automation that turns on all premise lights at dusk based on
   # photocell sensor with seasonal delay adjustment.
   #
-  # TIME GUARD: Only runs between 3:45 PM and 7:30 PM to prevent false triggers
-  # from sensor glitches at other times.
+  # TIME GUARD: Only runs after 3:45 PM and before sunset + 20 minutes.
+  # Upper bound tracks sunset year-round (replaces hard 7:30 PM cutoff).
+  #
+  # DUPLICATE GUARD: Skips if premise lights already on. Prevents re-trigger
+  # from photocell bouncing during passing clouds or weather changes.
   #
   # SEASONAL DELAY: Calculated based on current month to compensate for varying
   # ambient light levels at photocell trigger time.
@@ -143,15 +142,21 @@ automation:
     trigger:
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "on"
+        to: "off"
     condition:
       - condition: time
         after: "15:45:00"
-        before: "19:30:00"
+      - condition: sun
+        before: sunset
+        before_offset: "+00:20:00"
+      # Prevent re-trigger: skip if premise lights are already on
+      - condition: state
+        entity_id: light.front_porch_override
+        state: "off"
     action:
       # Apply seasonal delay before turning on lights
-      - delay:
-          minutes: >
+      - variables:
+          seasonal_delay: >
             {% set month = now().month %}
             {% if month in [5, 6, 7] %}
               {{ states('input_number.premise_summer_delay') | int }}
@@ -162,6 +167,8 @@ automation:
             {% else %}
               {{ states('input_number.premise_winter_delay') | int }}
             {% endif %}
+      - delay:
+          minutes: "{{ seasonal_delay | int }}"
 
       # Double-send: Critical exterior lighting activation at dusk
       # ensures property security and safety lighting reliability
@@ -209,9 +216,9 @@ automation:
   # Runs 15 minutes after sunset as a failsafe.
   #
   # CONDITIONS:
-  # * Photocell module is still OFF (should be ON by now if working)
-  # * Premise lights are still OFF (photocell automation didn't run)
-  # * Sun is below horizon (it's actually dark)
+  # * Premise lights are still OFF (primary automation failed for any reason)
+  #   Photocell state is irrelevant - only light state matters at this point.
+  #   Catches all failure modes: photocell failure, HA hiccup, scene collision.
   #
   # NOTIFICATION: Escalated to House Alerts to indicate maintenance needed
   ###############################################################################
@@ -223,17 +230,10 @@ automation:
         event: sunset
         offset: "+00:15:00"
     condition:
-      # Photocell should be ON by now but isn't
-      - condition: state
-        entity_id: switch.photocell_micro_module
-        state: "off"
-      # Lights are still off
+      # Lights are still off - fire regardless of why primary automation failed
       - condition: state
         entity_id: light.front_porch_override
         state: "off"
-      # It's actually dark (sun below horizon)
-      - condition: sun
-        after: sunset
     action:
       - action: notify.house_alerts
         data:
@@ -273,7 +273,7 @@ automation:
     trigger:
       - platform: state
         entity_id: switch.photocell_micro_module
-        to: "off"
+        to: "on"
     condition:
       - condition: sun
         after: sunrise
