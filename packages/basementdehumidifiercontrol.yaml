@@ -26,7 +26,6 @@
 # - No notification for peak hour shutoff (3 PM Mon-Fri)
 #
 ###############################################################################
-
 automation:
   - id: basement_dehumidifier_on
     alias: "Basement Dehumidifier - Turn On"
@@ -35,7 +34,9 @@ automation:
         entity_id: sensor.basement_humidity_sensor_humidity
         above: 50
     condition:
-      # Allow on weekends anytime, or weekdays outside peak hours (3-7 PM)
+      - condition: state          # only act if switch is currently off
+        entity_id: switch.scheduled_power_save
+        state: "off"
       - condition: or
         conditions:
           - condition: time
@@ -77,6 +78,9 @@ automation:
         at: "15:00:00"
         id: time_trigger
     condition:
+      - condition: state          # only act if switch is currently on
+        entity_id: switch.scheduled_power_save
+        state: "on"
       - condition: or
         conditions:
           - condition: numeric_state
