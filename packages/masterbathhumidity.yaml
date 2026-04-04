@@ -8,12 +8,12 @@
 # Features:
 #   - Detects showers by monitoring humidity rise patterns
 #   - Relative rise method (baseline vs peak) works year-round
-#   - Minimum 15-minute runtime after detection
+#   - Comfort delay before fan turns on (adjustable)
+#   - Minimum 15-minute runtime after fan starts
 #   - Continues until humidity drops to 25% of peak rise
 #   - 2-hour safety timeout prevents infinite loops
 #   - Manual fan activation includes 15-minute auto-off timer
 #   - Coordinates with HVAC exhaust boost after fan cycle
-#   - Confirmation lock prevents baseline drift during detection delay
 # ==================================================
 
 input_number:
@@ -47,21 +47,14 @@ input_number:
     step: 1
     mode: box
 
-input_boolean:
-  master_bath_confirmation_pending:
-    name: Master Bath Confirmation Pending
-    icon: mdi:timer-sand
-
 automation:
   # --------------------------------------------------
   # Master Bath Humidity - Shower Detection (Polling)
   #
   # Runs every 30 seconds to check humidity patterns.
-  # Detects rising humidity, sets baseline, confirms with delay,
-  # runs fan until humidity drops to acceptable level.
-  #
-  # Confirmation lock prevents baseline drift during 4-minute
-  # detection delay by freezing peak value when threshold first met.
+  # Detects rising humidity, locks baseline and peak at
+  # detection time, waits comfort delay, then turns fan on.
+  # Fan runs until humidity drops to acceptable level.
   # --------------------------------------------------
   - id: master_bath_humidity_shower_detection
     alias: "Master Bath Humidity - Shower Detection"
@@ -73,12 +66,10 @@ automation:
           current_humidity: "{{ states('sensor.master_bath_humidity') | float(0) }}"
           baseline: "{{ states('input_number.master_bath_humidity_baseline') | float(0) }}"
           peak: "{{ states('input_number.master_bath_humidity_peak') | float(0) }}"
-          last_update: "{{ states('input_number.master_bath_humidity_last_update') | float(0) }}"
           fan_state: "{{ states('light.master_bath_fan') }}"
           loop_start: "{{ states('input_number.master_bath_fan_loop_start') | float(0) }}"
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
-          confirmation_pending: "{{ is_state('input_boolean.master_bath_confirmation_pending', 'on') }}"
 
       # Update last_update timestamp every cycle
       - service: input_number.set_value
@@ -99,7 +90,6 @@ automation:
               - condition: template
                 value_template: "{{ time_since_loop_start < 7200 }}"
 
-              # Calculate current rise and target threshold
               - variables:
                   peak_rise: "{{ peak - baseline }}"
                   current_rise: "{{ current_humidity - baseline }}"
@@ -133,9 +123,6 @@ automation:
                   entity_id: input_number.master_bath_fan_loop_start
                 data:
                   value: 0
-              - service: input_boolean.turn_off
-                target:
-                  entity_id: input_boolean.master_bath_confirmation_pending
 
               # Coordinate with HVAC system
               - service: script.hvac_exhaust_boost
@@ -168,9 +155,6 @@ automation:
                   entity_id: input_number.master_bath_fan_loop_start
                 data:
                   value: 0
-              - service: input_boolean.turn_off
-                target:
-                  entity_id: input_boolean.master_bath_confirmation_pending
 
               - service: notify.house_alerts
                 data:
@@ -181,86 +165,51 @@ automation:
 
           # --------------------------------------------------
           # Case 3: Detecting shower - monitor for rising humidity
+          #
+          # On threshold met: lock baseline and peak at detection
+          # time, wait comfort delay, then turn fan on. No re-check.
+          # Default: keep rolling peak up to date.
           # --------------------------------------------------
           - conditions:
               - condition: template
                 value_template: "{{ fan_state == 'off' and baseline == 0 }}"
             sequence:
               - choose:
-                  # Sub-case: Rising humidity detected - START confirmation
                   - conditions:
                       - condition: template
                         value_template: >
                           {% set threshold = 8 if current_humidity < 50 else 5 %}
                           {{ peak > 0 and (current_humidity - peak) >= threshold }}
-                      - condition: state
-                        entity_id: input_boolean.master_bath_confirmation_pending
-                        state: "off"
                     sequence:
-                      # Lock confirmation state
-                      - service: input_boolean.turn_on
+                      # Lock baseline and peak at detection time
+                      - service: input_number.set_value
                         target:
-                          entity_id: input_boolean.master_bath_confirmation_pending
+                          entity_id: input_number.master_bath_humidity_baseline
+                        data:
+                          value: "{{ peak | float(0) }}"
 
-                      # 4-minute delay to confirm sustained rise (actual shower)
-                      - delay: "00:04:00"
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_humidity_peak
+                        data:
+                          value: "{{ current_humidity | float(0) }}"
 
-                      # Re-check humidity after delay
-                      - variables:
-                          confirmed_humidity: "{{ states('sensor.master_bath_humidity') | float(0) }}"
-                          locked_peak: "{{ states('input_number.master_bath_humidity_peak') | float(0) }}"
+                      # Comfort delay - adjust to taste
+                      - delay: "00:01:30"
 
-                      # If rise still present, start fan - otherwise clean up lock
-                      - choose:
-                          - conditions:
-                              - condition: template
-                                value_template: >
-                                  {% set threshold = 8 if confirmed_humidity < 50 else 5 %}
-                                  {{ (confirmed_humidity - locked_peak) >= threshold }}
-                            sequence:
-                              # Set baseline to the locked peak value (original starting point)
-                              - service: input_number.set_value
-                                target:
-                                  entity_id: input_number.master_bath_humidity_baseline
-                                data:
-                                  value: "{{ locked_peak }}"
+                      # Start timer and turn fan on
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_fan_loop_start
+                        data:
+                          value: "{{ now().timestamp() }}"
 
-                              # Update peak to current (confirmed) humidity
-                              - service: input_number.set_value
-                                target:
-                                  entity_id: input_number.master_bath_humidity_peak
-                                data:
-                                  value: "{{ confirmed_humidity }}"
+                      - service: light.turn_on
+                        target:
+                          entity_id: light.master_bath_fan
 
-                              # Start loop timer (use now() not pre-delay time_now)
-                              - service: input_number.set_value
-                                target:
-                                  entity_id: input_number.master_bath_fan_loop_start
-                                data:
-                                  value: "{{ now().timestamp() }}"
-
-                              # Turn on fan
-                              - service: light.turn_on
-                                target:
-                                  entity_id: light.master_bath_fan
-
-                              # Clear confirmation lock
-                              - service: input_boolean.turn_off
-                                target:
-                                  entity_id: input_boolean.master_bath_confirmation_pending
-
-                        # Clear confirmation lock if humidity dropped during delay
-                        default:
-                          - service: input_boolean.turn_off
-                            target:
-                              entity_id: input_boolean.master_bath_confirmation_pending
-
-                # Default: Update peak if NOT in confirmation period
+                # Default: keep rolling peak current
                 default:
-                  - condition: state
-                    entity_id: input_boolean.master_bath_confirmation_pending
-                    state: "off"
-
                   - service: input_number.set_value
                     target:
                       entity_id: input_number.master_bath_humidity_peak
@@ -299,9 +248,6 @@ automation:
           entity_id: input_number.master_bath_humidity_peak
         data:
           value: 0
-      - service: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.master_bath_confirmation_pending
 
   # --------------------------------------------------
   # Master Bath Fan - Manual Timer

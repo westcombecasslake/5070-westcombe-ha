@@ -19,7 +19,6 @@
 #
 # INSTEON SCENES:
 # * Group 21: Main premise lighting scene (all exterior lights)
-# * Group 29: Front porch override scene
 #
 # SEASONAL DELAY LOGIC:
 # The photocell triggers earlier in summer (more ambient light at dusk) and later
@@ -151,7 +150,7 @@ automation:
         before_offset: "+00:20:00"
       # Prevent re-trigger: skip if premise lights are already on
       - condition: state
-        entity_id: light.front_porch_override
+        entity_id: light.entry_closet_premise
         state: "off"
     action:
       # Apply seasonal delay before turning on lights
@@ -232,7 +231,7 @@ automation:
     condition:
       # Lights are still off - fire regardless of why primary automation failed
       - condition: state
-        entity_id: light.front_porch_override
+        entity_id: light.entry_closet_premise
         state: "off"
     action:
       - action: notify.house_alerts
@@ -297,35 +296,6 @@ automation:
           entity_id: input_boolean.front_motion_armed
 
   ###############################################################################
-  # AUTOMATION: Front Porch Manual Override
-  #
-  # When front porch override light is manually turned on, it stays on for
-  # 3 hours then automatically turns off the override scene.
-  #
-  # MODE RESTART: If triggered again while timer is running, the 3-hour timer
-  # resets (ensures light stays on for full 3 hours from last activation).
-  ###############################################################################
-  - id: premise_front_porch_manual_override
-    alias: "Front Porch Manual Override"
-    mode: restart
-    trigger:
-      - platform: state
-        entity_id: light.front_porch_override
-        to: "on"
-    action:
-      - delay:
-          hours: 3
-      # Double-send: Manual override shutoff after timer
-      # ensures automatic deactivation after extended use
-      - action: insteon.scene_off
-        data:
-          group: 29
-      - delay: "00:00:03"
-      - action: insteon.scene_off
-        data:
-          group: 29
-
-  ###############################################################################
   # AUTOMATION: Front Porch Motion Timer
   #
   # When motion is detected at front door during dark hours, turns on premise
@@ -372,19 +342,11 @@ automation:
       # Second event cancels first before reaching the notification check.
       - delay: "00:00:02"
 
-      # Conditional notification: only send if lights are currently off
-      # (indicates new motion session, not continued motion)
-      - choose:
-          - conditions:
-              - condition: state
-                entity_id: light.front_porch_override
-                state: "off"
-            sequence:
-              - action: notify.house_alerts
-                data:
-                  title: "Front Motion at Night"
-                  message: "{{ now().strftime('%I:%M %p') }}"
-        default: []
+      # Notification: motion detected at night
+      - action: notify.house_alerts
+        data:
+          title: "Front Motion at Night"
+          message: "{{ now().strftime('%I:%M %p') }}"
 
       # Double-send: Motion-triggered security lighting at night
       # ensures reliable activation when someone approaches
