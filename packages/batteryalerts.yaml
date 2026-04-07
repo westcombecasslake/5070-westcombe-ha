@@ -127,7 +127,7 @@ automation:
           - sensor.master_bath_temp_humidity_sensor_battery
           - sensor.master_bedroom_smoke_co_alarm_battery
           - sensor.office_smoke_alarm_battery
-          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.east_suite_smoke_alarm_battery
           - sensor.sump_pump_depth_alert_battery
           - sensor.hot_water_heater_leak_sensor_battery
           - sensor.sump_leak_sensor_battery
@@ -176,7 +176,7 @@ automation:
           - sensor.master_bath_temp_humidity_sensor_battery
           - sensor.master_bedroom_smoke_co_alarm_battery
           - sensor.office_smoke_alarm_battery
-          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.east_suite_smoke_alarm_battery
           - sensor.sump_pump_depth_alert_battery
           - sensor.hot_water_heater_leak_sensor_battery
           - sensor.sump_leak_sensor_battery
@@ -224,7 +224,7 @@ automation:
           - sensor.master_bath_temp_humidity_sensor_battery
           - sensor.master_bedroom_smoke_co_alarm_battery
           - sensor.office_smoke_alarm_battery
-          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.east_suite_smoke_alarm_battery
           - sensor.sump_pump_depth_alert_battery
           - sensor.hot_water_heater_leak_sensor_battery
           - sensor.sump_leak_sensor_battery
@@ -276,7 +276,7 @@ automation:
           - sensor.master_bath_temp_humidity_sensor_battery
           - sensor.master_bedroom_smoke_co_alarm_battery
           - sensor.office_smoke_alarm_battery
-          - sensor.sarah_bedroom_smoke_alarm_battery
+          - sensor.east_suite_smoke_alarm_battery
           - sensor.sump_pump_depth_alert_battery
           - sensor.hot_water_heater_leak_sensor_battery
           - sensor.sump_leak_sensor_battery

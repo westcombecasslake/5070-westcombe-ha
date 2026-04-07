@@ -1,19 +1,14 @@
 # ==================================================
 # Master Bath Humidity Control
 #
-# Automatic exhaust fan control based on relative humidity rise
-# detection (shower events). Uses baseline tracking to work correctly
-# regardless of seasonal outdoor humidity levels.
-#
 # Features:
-#   - Detects showers by monitoring humidity rise patterns
-#   - Relative rise method (baseline vs peak) works year-round
+#   - Relative rise detection, works year-round
 #   - Comfort delay before fan turns on (adjustable)
-#   - Minimum 15-minute runtime after fan starts
-#   - Continues until humidity drops to 25% of peak rise
-#   - 2-hour safety timeout prevents infinite loops
-#   - Manual fan activation includes 15-minute auto-off timer
-#   - Coordinates with HVAC exhaust boost after fan cycle
+#   - 15-minute minimum runtime
+#   - Drops to 25% of peak rise before shutting off
+#   - 2-hour safety timeout
+#   - Manual fan 15-minute auto-off
+#   - HVAC exhaust boost after cycle
 # ==================================================
 
 input_number:
@@ -50,11 +45,6 @@ input_number:
 automation:
   # --------------------------------------------------
   # Master Bath Humidity - Shower Detection (Polling)
-  #
-  # Runs every 30 seconds to check humidity patterns.
-  # Detects rising humidity, locks baseline and peak at
-  # detection time, waits comfort delay, then turns fan on.
-  # Fan runs until humidity drops to acceptable level.
   # --------------------------------------------------
   - id: master_bath_humidity_shower_detection
     alias: "Master Bath Humidity - Shower Detection"
@@ -71,7 +61,6 @@ automation:
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
 
-      # Update last_update timestamp every cycle
       - service: input_number.set_value
         target:
           entity_id: input_number.master_bath_humidity_last_update
@@ -80,95 +69,84 @@ automation:
 
       - choose:
           # --------------------------------------------------
-          # Case 1: Fan is running - check if we should turn off
+          # Case 1: Fan is running
+          # Inner choose handles timeout vs normal shutdown.
+          # Both paths always reachable.
           # --------------------------------------------------
           - conditions:
               - condition: template
                 value_template: "{{ fan_state == 'on' and baseline > 0 }}"
             sequence:
-              # Safety timeout: 2 hours maximum runtime
-              - condition: template
-                value_template: "{{ time_since_loop_start < 7200 }}"
-
               - variables:
                   peak_rise: "{{ peak - baseline }}"
                   current_rise: "{{ current_humidity - baseline }}"
                   target_rise: "{{ peak_rise * 0.25 }}"
                   elapsed_minutes: "{{ time_since_loop_start / 60 }}"
 
-              # Turn off fan if:
-              #   1. Minimum 15 minutes have passed, AND
-              #   2. Current rise has dropped to 25% of peak rise
-              - condition: template
-                value_template: >
-                  {{ elapsed_minutes >= 15 and current_rise <= target_rise }}
+              - choose:
+                  # Safety timeout: force off after 2 hours
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ time_since_loop_start >= 7200 }}"
+                    sequence:
+                      - service: light.turn_off
+                        target:
+                          entity_id: light.master_bath_fan
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_humidity_baseline
+                        data:
+                          value: 0
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_humidity_peak
+                        data:
+                          value: 0
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_fan_loop_start
+                        data:
+                          value: 0
+                      - service: notify.house_alerts
+                        data:
+                          title: "Master Bath Fan Safety Timeout"
+                          message: >
+                            Fan forced off after 2-hour timeout.
+                            Check humidity sensor and automation logic.
 
-              - service: light.turn_off
-                target:
-                  entity_id: light.master_bath_fan
-
-              # Reset tracking values
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.master_bath_humidity_baseline
-                data:
-                  value: 0
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.master_bath_humidity_peak
-                data:
-                  value: 0
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.master_bath_fan_loop_start
-                data:
-                  value: 0
-
-              # Coordinate with HVAC system
-              - service: script.hvac_exhaust_boost
-                data: {}
-
-          # --------------------------------------------------
-          # Case 2: Safety timeout exceeded - force fan off
-          # --------------------------------------------------
-          - conditions:
-              - condition: template
-                value_template: "{{ fan_state == 'on' and time_since_loop_start >= 7200 }}"
-            sequence:
-              - service: light.turn_off
-                target:
-                  entity_id: light.master_bath_fan
-
-              # Reset all tracking
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.master_bath_humidity_baseline
-                data:
-                  value: 0
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.master_bath_humidity_peak
-                data:
-                  value: 0
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.master_bath_fan_loop_start
-                data:
-                  value: 0
-
-              - service: notify.house_alerts
-                data:
-                  title: "Master Bath Fan Safety Timeout"
-                  message: >
-                    Fan forced off after 2-hour timeout.
-                    Check humidity sensor and automation logic.
+                  # Normal shutdown: 15 min elapsed and
+                  # humidity dropped to 25% of peak rise
+                  - conditions:
+                      - condition: template
+                        value_template: >
+                          {{ elapsed_minutes >= 15 and
+                             current_rise <= target_rise }}
+                    sequence:
+                      - service: light.turn_off
+                        target:
+                          entity_id: light.master_bath_fan
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_humidity_baseline
+                        data:
+                          value: 0
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_humidity_peak
+                        data:
+                          value: 0
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.master_bath_fan_loop_start
+                        data:
+                          value: 0
+                      - service: script.hvac_exhaust_boost
+                        data: {}
 
           # --------------------------------------------------
-          # Case 3: Detecting shower - monitor for rising humidity
-          #
-          # On threshold met: lock baseline and peak at detection
-          # time, wait comfort delay, then turn fan on. No re-check.
-          # Default: keep rolling peak up to date.
+          # Case 2: Detecting shower
+          # Lock baseline and peak at detection, wait comfort
+          # delay, turn fan on. No re-check.
           # --------------------------------------------------
           - conditions:
               - condition: template
@@ -181,34 +159,27 @@ automation:
                           {% set threshold = 8 if current_humidity < 50 else 5 %}
                           {{ peak > 0 and (current_humidity - peak) >= threshold }}
                     sequence:
-                      # Lock baseline and peak at detection time
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.master_bath_humidity_baseline
                         data:
                           value: "{{ peak | float(0) }}"
-
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.master_bath_humidity_peak
                         data:
                           value: "{{ current_humidity | float(0) }}"
-
                       # Comfort delay - adjust to taste
                       - delay: "00:01:30"
-
-                      # Start timer and turn fan on
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.master_bath_fan_loop_start
                         data:
                           value: "{{ now().timestamp() }}"
-
                       - service: light.turn_on
                         target:
                           entity_id: light.master_bath_fan
 
-                # Default: keep rolling peak current
                 default:
                   - service: input_number.set_value
                     target:
@@ -218,10 +189,6 @@ automation:
 
   # --------------------------------------------------
   # Master Bath Humidity - Timeout Reset
-  #
-  # If humidity hasn't changed in 15 minutes and fan is off,
-  # reset baseline/peak to prevent stale values from triggering
-  # false detection.
   # --------------------------------------------------
   - id: master_bath_humidity_timeout
     alias: "Master Bath Humidity - Timeout"
@@ -251,10 +218,6 @@ automation:
 
   # --------------------------------------------------
   # Master Bath Fan - Manual Timer
-  #
-  # If fan is manually turned on (not by automation),
-  # automatically turn it off after 15 minutes.
-  # Independent of humidity-based control.
   # --------------------------------------------------
   - id: master_bath_fan_manual_timer
     alias: "Master Bath Fan - Manual Timer"
@@ -263,12 +226,39 @@ automation:
         entity_id: light.master_bath_fan
         to: "on"
     condition:
-      # Only trigger if baseline is 0 (not triggered by automation)
       - condition: template
         value_template: >
           {{ states('input_number.master_bath_humidity_baseline') | float(0) == 0 }}
     action:
       - delay: "00:15:00"
+      - service: light.turn_off
+        target:
+          entity_id: light.master_bath_fan
+
+  # --------------------------------------------------
+  # Master Bath Humidity - Startup Reset
+  # --------------------------------------------------
+  - id: master_bath_humidity_startup_reset
+    alias: "Master Bath Humidity - Startup Reset"
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bath_humidity_baseline
+        data:
+          value: 0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bath_humidity_peak
+        data:
+          value: 0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.master_bath_fan_loop_start
+        data:
+          value: 0
       - service: light.turn_off
         target:
           entity_id: light.master_bath_fan
