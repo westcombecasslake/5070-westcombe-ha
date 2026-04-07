@@ -6,7 +6,8 @@
 #   - Comfort delay before fan turns on (adjustable)
 #   - 15-minute minimum runtime
 #   - Drops to 25% of peak rise before shutting off
-#   - 2-hour safety timeout
+#   - 2-hour safety timeout (always reachable)
+#   - Startup reset on HA restart
 #   - Manual fan 15-minute auto-off
 #   - HVAC exhaust boost after cycle
 # ==================================================
@@ -112,7 +113,7 @@ automation:
                           title: "Master Bath Fan Safety Timeout"
                           message: >
                             Fan forced off after 2-hour timeout.
-                            Check humidity sensor and automation logic.
+                            Check humidity sensor and automation.
 
                   # Normal shutdown: 15 min elapsed and
                   # humidity dropped to 25% of peak rise
@@ -145,8 +146,8 @@ automation:
 
           # --------------------------------------------------
           # Case 2: Detecting shower
-          # Lock baseline and peak at detection, wait comfort
-          # delay, turn fan on. No re-check.
+          # Lock baseline and peak at detection, comfort delay,
+          # then fan on. No re-check.
           # --------------------------------------------------
           - conditions:
               - condition: template
@@ -169,8 +170,8 @@ automation:
                           entity_id: input_number.master_bath_humidity_peak
                         data:
                           value: "{{ current_humidity | float(0) }}"
-                      # Comfort delay - adjust to taste
-                      - delay: "00:01:30"
+                      # Comfort delay — 5 minutes
+                      - delay: "00:05:00"
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.master_bath_fan_loop_start
