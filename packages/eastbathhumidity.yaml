@@ -5,19 +5,14 @@
 # detection (shower events). Uses baseline tracking to work correctly
 # regardless of seasonal outdoor humidity levels.
 #
-# This is an instance of the bathroom humidity control pattern
-# (see also: masterbathhumidity.yaml, middlebathhumidity.yaml). Each bathroom has its own
-# helpers and entities to allow independent monitoring.
-#
 # Features:
-#   - Detects showers by monitoring humidity rise patterns
-#   - Relative rise method (baseline vs peak) works year-round
-#   - Minimum 15-minute runtime after detection
-#   - Continues until humidity drops to 25% of peak rise
-#   - 2-hour safety timeout prevents infinite loops
-#   - Manual fan activation includes 15-minute auto-off timer
-#   - Coordinates with HVAC exhaust boost after fan cycle
-#   - Confirmation lock prevents baseline drift during detection delay
+#   - Relative rise detection, works year-round
+#   - 5-minute comfort delay before fan turns on
+#   - Flat 20-minute runtime per HVAC guidelines
+#   - 2-hour safety timeout (backstop only)
+#   - Startup reset on HA restart
+#   - Manual fan 20-minute auto-off
+#   - HVAC exhaust boost after cycle
 # ==================================================
 
 input_number:
@@ -51,21 +46,9 @@ input_number:
     step: 1
     mode: box
 
-input_boolean:
-  east_bath_confirmation_pending:
-    name: East Bath Confirmation Pending
-    icon: mdi:timer-sand
-
 automation:
   # --------------------------------------------------
   # East Bath Humidity - Shower Detection (Polling)
-  #
-  # Runs every 30 seconds to check humidity patterns.
-  # Detects rising humidity, sets baseline, confirms with delay,
-  # runs fan until humidity drops to acceptable level.
-  #
-  # Confirmation lock prevents baseline drift during 4-minute
-  # detection delay by freezing peak value when threshold first met.
   # --------------------------------------------------
   - id: east_bath_humidity_shower_detection
     alias: "East Bath Humidity - Shower Detection"
@@ -77,14 +60,11 @@ automation:
           current_humidity: "{{ states('sensor.east_suite_bathroom_humidity') | float(0) }}"
           baseline: "{{ states('input_number.east_bath_humidity_baseline') | float(0) }}"
           peak: "{{ states('input_number.east_bath_humidity_peak') | float(0) }}"
-          last_update: "{{ states('input_number.east_bath_humidity_last_update') | float(0) }}"
           fan_state: "{{ states('fan.east_suite_bathroom_humidity') }}"
           loop_start: "{{ states('input_number.east_bath_fan_loop_start') | float(0) }}"
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
-          confirmation_pending: "{{ is_state('input_boolean.east_bath_confirmation_pending', 'on') }}"
 
-      # Update last_update timestamp every cycle
       - service: input_number.set_value
         target:
           entity_id: input_number.east_bath_humidity_last_update
@@ -93,35 +73,19 @@ automation:
 
       - choose:
           # --------------------------------------------------
-          # Case 1: Fan is running - check if we should turn off
+          # Case 1: Safety net only
+          # Fires if Case 2 sequence is interrupted.
+          # Forces fan off after 2-hour timeout.
           # --------------------------------------------------
           - conditions:
               - condition: template
                 value_template: "{{ fan_state == 'on' and baseline > 0 }}"
             sequence:
-              # Safety timeout: 2 hours maximum runtime
               - condition: template
-                value_template: "{{ time_since_loop_start < 7200 }}"
-
-              # Calculate current rise and target threshold
-              - variables:
-                  peak_rise: "{{ peak - baseline }}"
-                  current_rise: "{{ current_humidity - baseline }}"
-                  target_rise: "{{ peak_rise * 0.25 }}"
-                  elapsed_minutes: "{{ time_since_loop_start / 60 }}"
-
-              # Turn off fan if:
-              #   1. Minimum 15 minutes have passed, AND
-              #   2. Current rise has dropped to 25% of peak rise
-              - condition: template
-                value_template: >
-                  {{ elapsed_minutes >= 15 and current_rise <= target_rise }}
-
+                value_template: "{{ time_since_loop_start >= 7200 }}"
               - service: fan.turn_off
                 target:
                   entity_id: fan.east_suite_bathroom_humidity
-
-              # Reset tracking values
               - service: input_number.set_value
                 target:
                   entity_id: input_number.east_bath_humidity_baseline
@@ -137,134 +101,73 @@ automation:
                   entity_id: input_number.east_bath_fan_loop_start
                 data:
                   value: 0
-              - service: input_boolean.turn_off
-                target:
-                  entity_id: input_boolean.east_bath_confirmation_pending
-
-              # Coordinate with HVAC system
-              - service: script.hvac_exhaust_boost
-                data: {}
-
-          # --------------------------------------------------
-          # Case 2: Safety timeout exceeded - force fan off
-          # --------------------------------------------------
-          - conditions:
-              - condition: template
-                value_template: "{{ fan_state == 'on' and time_since_loop_start >= 7200 }}"
-            sequence:
-              - service: fan.turn_off
-                target:
-                  entity_id: fan.east_suite_bathroom_humidity
-
-              # Reset all tracking
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.east_bath_humidity_baseline
-                data:
-                  value: 0
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.east_bath_humidity_peak
-                data:
-                  value: 0
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.east_bath_fan_loop_start
-                data:
-                  value: 0
-              - service: input_boolean.turn_off
-                target:
-                  entity_id: input_boolean.east_bath_confirmation_pending
-
               - service: notify.house_alerts
                 data:
                   title: "East Bath Fan Safety Timeout"
                   message: >
                     Fan forced off after 2-hour timeout.
-                    Check humidity sensor and automation logic.
+                    Check humidity sensor and automation.
 
           # --------------------------------------------------
-          # Case 3: Detecting shower - monitor for rising humidity
+          # Case 2: Full shower cycle
+          # Detect → comfort delay → fan on → 20-min run
+          # → fan off → reset → HVAC boost.
           # --------------------------------------------------
           - conditions:
               - condition: template
                 value_template: "{{ fan_state == 'off' and baseline == 0 }}"
             sequence:
               - choose:
-                  # Sub-case: Rising humidity detected - START confirmation
                   - conditions:
                       - condition: template
                         value_template: >
-                          {% set threshold = 8 if current_humidity < 50 else 5 %}
+                          {% set threshold = 8 if current_humidity < 50 else 8 %}
                           {{ peak > 0 and (current_humidity - peak) >= threshold }}
-                      - condition: state
-                        entity_id: input_boolean.east_bath_confirmation_pending
-                        state: "off"
                     sequence:
-                      # Lock confirmation state
-                      - service: input_boolean.turn_on
+                      - service: input_number.set_value
                         target:
-                          entity_id: input_boolean.east_bath_confirmation_pending
+                          entity_id: input_number.east_bath_humidity_baseline
+                        data:
+                          value: "{{ peak | float(0) }}"
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.east_bath_humidity_peak
+                        data:
+                          value: "{{ current_humidity | float(0) }}"
+                      # Comfort delay — 5 minutes
+                      - delay: "00:05:00"
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.east_bath_fan_loop_start
+                        data:
+                          value: "{{ now().timestamp() }}"
+                      - service: fan.turn_on
+                        target:
+                          entity_id: fan.east_suite_bathroom_humidity
+                      # Run for 20 minutes then shut down
+                      - delay: "00:20:00"
+                      - service: fan.turn_off
+                        target:
+                          entity_id: fan.east_suite_bathroom_humidity
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.east_bath_humidity_baseline
+                        data:
+                          value: 0
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.east_bath_humidity_peak
+                        data:
+                          value: 0
+                      - service: input_number.set_value
+                        target:
+                          entity_id: input_number.east_bath_fan_loop_start
+                        data:
+                          value: 0
+                      - service: script.hvac_exhaust_boost
+                        data: {}
 
-                      # 4-minute delay to confirm sustained rise (actual shower)
-                      - delay: "00:04:00"
-
-                      # Re-check humidity after delay
-                      - variables:
-                          confirmed_humidity: "{{ states('sensor.east_suite_bathroom_humidity') | float(0) }}"
-                          locked_peak: "{{ states('input_number.east_bath_humidity_peak') | float(0) }}"
-
-                      # If rise still present, start fan - otherwise clean up lock
-                      - choose:
-                          - conditions:
-                              - condition: template
-                                value_template: >
-                                  {% set threshold = 8 if confirmed_humidity < 50 else 5 %}
-                                  {{ (confirmed_humidity - locked_peak) >= threshold }}
-                            sequence:
-                              # Set baseline to the locked peak value (original starting point)
-                              - service: input_number.set_value
-                                target:
-                                  entity_id: input_number.east_bath_humidity_baseline
-                                data:
-                                  value: "{{ locked_peak }}"
-
-                              # Update peak to current (confirmed) humidity
-                              - service: input_number.set_value
-                                target:
-                                  entity_id: input_number.east_bath_humidity_peak
-                                data:
-                                  value: "{{ confirmed_humidity }}"
-
-                              # Start loop timer (use now() not pre-delay time_now)
-                              - service: input_number.set_value
-                                target:
-                                  entity_id: input_number.east_bath_fan_loop_start
-                                data:
-                                  value: "{{ now().timestamp() }}"
-
-                              # Turn on fan
-                              - service: fan.turn_on
-                                target:
-                                  entity_id: fan.east_suite_bathroom_humidity
-
-                              # Clear confirmation lock
-                              - service: input_boolean.turn_off
-                                target:
-                                  entity_id: input_boolean.east_bath_confirmation_pending
-
-                        # Clear confirmation lock if humidity dropped during delay
-                        default:
-                          - service: input_boolean.turn_off
-                            target:
-                              entity_id: input_boolean.east_bath_confirmation_pending
-
-                # Default: Update peak if NOT in confirmation period
                 default:
-                  - condition: state
-                    entity_id: input_boolean.east_bath_confirmation_pending
-                    state: "off"
-
                   - service: input_number.set_value
                     target:
                       entity_id: input_number.east_bath_humidity_peak
@@ -273,10 +176,6 @@ automation:
 
   # --------------------------------------------------
   # East Bath Humidity - Timeout Reset
-  #
-  # If humidity hasn't changed in 15 minutes and fan is off,
-  # reset baseline/peak to prevent stale values from triggering
-  # false detection.
   # --------------------------------------------------
   - id: east_bath_humidity_timeout
     alias: "East Bath Humidity - Timeout"
@@ -303,16 +202,9 @@ automation:
           entity_id: input_number.east_bath_humidity_peak
         data:
           value: 0
-      - service: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.east_bath_confirmation_pending
 
   # --------------------------------------------------
   # East Bath Fan - Manual Timer
-  #
-  # If fan is manually turned on (not by automation),
-  # automatically turn it off after 15 minutes.
-  # Independent of humidity-based control.
   # --------------------------------------------------
   - id: east_bath_fan_manual_timer
     alias: "East Bath Fan - Manual Timer"
@@ -321,12 +213,39 @@ automation:
         entity_id: fan.east_suite_bathroom_humidity
         to: "on"
     condition:
-      # Only trigger if baseline is 0 (not triggered by automation)
       - condition: template
         value_template: >
           {{ states('input_number.east_bath_humidity_baseline') | float(0) == 0 }}
     action:
-      - delay: "00:15:00"
+      - delay: "00:20:00"
+      - service: fan.turn_off
+        target:
+          entity_id: fan.east_suite_bathroom_humidity
+
+  # --------------------------------------------------
+  # East Bath Humidity - Startup Reset
+  # --------------------------------------------------
+  - id: east_bath_humidity_startup_reset
+    alias: "East Bath Humidity - Startup Reset"
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.east_bath_humidity_baseline
+        data:
+          value: 0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.east_bath_humidity_peak
+        data:
+          value: 0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.east_bath_fan_loop_start
+        data:
+          value: 0
       - service: fan.turn_off
         target:
           entity_id: fan.east_suite_bathroom_humidity
