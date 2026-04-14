@@ -1,6 +1,6 @@
 # Air Quality Monitoring
 
-**Last Updated:** February 2026
+**Last Updated:** April 2026
 
 ---
 
@@ -11,7 +11,6 @@ The Air Quality Monitoring system provides comprehensive indoor air quality mana
 **Key Features:**
 - PM2.5 filtration takes absolute priority over all other HVAC fan automation
 - CO2 management via targeted exhaust ventilation
-- Party mode enhanced monitoring with periodic reminders
 - Daily air quality summaries
 - Sensor offline detection and recovery tracking
 - Four-tier Pushover notification system
@@ -24,15 +23,13 @@ The Air Quality Monitoring system provides comprehensive indoor air quality mana
 
 **IKEA Alpstuga Multi-Sensors (2):**
 - **Location 1:** Main living area (Floor 1)
-  - Entity IDs: `sensor.living_area_co2`, `sensor.living_area_pm25`, `sensor.living_area_tvoc`
+  - Entity IDs: `sensor.living_area_co2`, `sensor.living_area_pm25`
 - **Location 2:** Master bedroom (Floor 2)
-  - Entity IDs: `sensor.master_bedroom_co2`, `sensor.master_bedroom_pm25`, `sensor.master_bedroom_tvoc`
+  - Entity IDs: `sensor.master_bedroom_co2`, `sensor.master_bedroom_pm25`
 
 **Capabilities:**
 - CO2 monitoring (ppm)
-- PM2.5 particulate matter (Î¼g/mÂ³)
-- TVOC (Total Volatile Organic Compounds)
-- Temperature and humidity (if available)
+- PM2.5 particulate matter (μg/m³)
 - Battery powered or USB
 
 ### Ventilation Equipment
@@ -57,7 +54,7 @@ The Air Quality Monitoring system provides comprehensive indoor air quality mana
 
 Based on EPA Air Quality Index:
 
-| Level | Range (Î¼g/mÂ³) | Health Category | System Response |
+| Level | Range (μg/m³) | Health Category | System Response |
 |-------|---------------|-----------------|------------------|
 | Good | 0-12 | Safe for all | Normal operation |
 | Moderate | 12-35 | Acceptable | Monitor only |
@@ -67,9 +64,9 @@ Based on EPA Air Quality Index:
 | Hazardous | 250+ | Health emergency | HVAC filtration + Emergency |
 
 **System Triggers:**
-- **35 Î¼g/mÂ³:** Activates HVAC filtration, sends House Notice
-- **55 Î¼g/mÂ³:** Increases alert priority to House Alerts
-- **150 Î¼g/mÂ³:** Emergency notification with Priority 2
+- **35 μg/m³:** Activates HVAC filtration, sends House Notice
+- **55 μg/m³:** Increases alert priority to House Alerts
+- **150 μg/m³:** Emergency notification with Priority 2
 
 ### CO2 (Carbon Dioxide)
 
@@ -79,13 +76,12 @@ Based on ASHRAE and WHO guidelines:
 |-------|-------------|-------------|------------------|
 | Excellent | <800 | Fresh air | None |
 | Good | 800-1000 | Acceptable | None |
-| Acceptable | 1000-1500 | Fair | HVAC exhaust boost + reminder |
-| Poor | 1500-2000 | Stuffy/drowsy | Stronger ventilation + alert |
+| Acceptable | 1000-1500 | Fair | HVAC exhaust boost + open window reminder |
+| Poor | 1500-2000 | Stuffy/drowsy | HVAC exhaust boost + open doors and windows alert |
 | Very Poor | >2000 | Health concerns | Emergency alert |
 
 **System Triggers:**
-- **1000 ppm:** HVAC exhaust boost + "open windows" notification
-- **1200 ppm (party mode):** Periodic reminders every 15 minutes
+- **1000 ppm:** HVAC exhaust boost + notification with severity-based guidance
 - **2000 ppm:** Emergency alert to open windows immediately
 
 ---
@@ -94,7 +90,7 @@ Based on ASHRAE and WHO guidelines:
 
 ### PM2.5 Filtration (Highest Priority)
 
-**Activation (35 Î¼g/mÂ³ threshold):**
+**Activation (35 μg/m³ threshold):**
 1. Sets `input_boolean.pm25_filtration_active` to ON
 2. Records start time for duration tracking
 3. Turns HVAC fan to ON mode (runs continuously)
@@ -103,11 +99,11 @@ Based on ASHRAE and WHO guidelines:
 
 **Continuation:**
 - Runs every 10 minutes to keep HVAC fan ON
-- Continues until BOTH sensors read <12 Î¼g/mÂ³ (good air quality)
+- Continues until BOTH sensors read <12 μg/m³ (good air quality)
 - Minimum 15-minute runtime before deactivation allowed
 
 **Deactivation:**
-- Both sensors must be <12 Î¼g/mÂ³
+- Both sensors must be <12 μg/m³
 - Must have run for at least 15 minutes
 - Returns HVAC fan to AUTO mode
 - Sends operational log notification with duration
@@ -115,6 +111,7 @@ Based on ASHRAE and WHO guidelines:
 **Safety Timeout:**
 - 4-hour maximum continuous filtration
 - Prevents excessive HVAC runtime if sensor malfunction
+- Logs actual elapsed runtime at cutoff
 - Sends alert if timeout occurs
 
 **Priority Override:**
@@ -127,8 +124,10 @@ Based on ASHRAE and WHO guidelines:
 **Living Area (Floor 1):**
 - **Trigger:** 1000 ppm for 5 minutes
 - **Action:** Runs `script.hvac_exhaust_boost` (20-minute cycle)
-- **Notification:** "Open Windows" with outdoor temperature
-- **Condition:** Only when PM2.5 filtration is OFF and kitchen hood is ON
+- **Notification:** Severity-based guidance with outdoor temperature
+  - 1000-1500 ppm: "Open a window"
+  - 1500+ ppm: "Open doors and windows"
+- **Condition:** Only when PM2.5 filtration is OFF
 
 **Master Bedroom (Floor 2):**
 - **Trigger:** 1000 ppm for 5 minutes during nighttime (9 PM - 7 AM)
@@ -141,24 +140,6 @@ Based on ASHRAE and WHO guidelines:
 - **Action:** High-priority alert to open windows immediately
 - **Priority:** 1 (House Alerts)
 
-### Party Mode Integration
-
-**Activation:**
-1. Runs HVAC exhaust boost immediately
-2. Turns on entry bathroom fan for additional exhaust
-3. Sends activation notification
-
-**Periodic Monitoring:**
-- Checks CO2 every 15 minutes during party
-- If >1200 ppm, runs another exhaust boost and sends reminder
-- Helps manage elevated occupancy air quality
-
-**Deactivation:**
-1. Waits 30 minutes after party mode turns off
-2. Turns off kitchen hood (if it was left on)
-3. Runs final exhaust boost
-4. Sends summary with final air quality readings
-
 ---
 
 ## Notifications
@@ -166,42 +147,39 @@ Based on ASHRAE and WHO guidelines:
 ### House Alerts (Priority 1-2)
 
 **Emergency - Priority 2:**
-- PM2.5 >150 Î¼g/mÂ³ (Very Unhealthy)
-- Title: "âš ï¸ AIR QUALITY EMERGENCY"
+- PM2.5 >150 μg/m³ (Very Unhealthy)
+- Title: "⚠️ AIR QUALITY EMERGENCY"
 - Sound: Siren
 - Action required: Close windows, stay indoors
 
 **High Priority - Priority 1:**
-- PM2.5 55-150 Î¼g/mÂ³ (Unhealthy)
+- PM2.5 55-150 μg/m³ (Unhealthy)
 - CO2 >2000 ppm (Critical)
-- Title: "âš ï¸ AIR QUALITY ALERT" or "âš ï¸ CO2 CRITICAL"
+- Title: "⚠️ AIR QUALITY ALERT" or "⚠️ CO2 CRITICAL"
 - Sound: Loud alert
 - Action required: Immediate ventilation
 
 ### House Notices (Priority 0)
 
 **Standard Alerts:**
-- PM2.5 35-55 Î¼g/mÂ³ (Unhealthy for sensitive groups)
-- CO2 1000-2000 ppm (Open windows recommended)
-- Party mode periodic checks
+- PM2.5 35-55 μg/m³ (Unhealthy for sensitive groups)
+- CO2 1000-2000 ppm (Open windows recommended with severity guidance)
 - Filtration timeout alerts
 - Sensor offline alerts
 
 **Examples:**
-- "ðŸ’¨ Air Quality Alert" - Elevated PM2.5
-- "ðŸªŸ Open Windows" - High CO2 with outdoor temp
-- "ðŸŽ‰ Party Air Quality Check" - Periodic party monitoring
+- "💨 Air Quality Alert" - Elevated PM2.5
+- "🪟 Open Windows - CO2 Elevated" - High CO2 with outdoor temp and severity guidance
 
 ### Operational Log (Priority -2)
 
 **Silent Notifications:**
 - Return to normal air quality
-- Daily summaries at 7:00 AM
+- Daily summaries at 11:55 PM
 - Sensor recovery
-- Party mode deactivation summary
 
 **Daily Summary Includes:**
-- Color-coded emoji status for each floor (ðŸŸ¢ good, ðŸŸ¡ elevated, ðŸ”´ poor)
+- Color-coded emoji status for each floor (🟢 good, 🟡 elevated, 🔴 poor)
 - Max CO2 and PM2.5 readings with trend vs 7-day average
 - CO2 and PM2.5 split onto separate lines for readability
 - PM2.5 filtration events, total runtime, and trend comparison
@@ -209,27 +187,27 @@ Based on ASHRAE and WHO guidelines:
 
 **Daily Summary Format Example:**
 ```
-ðŸ“Š Daily Air Quality
+📊 Daily Air Quality
 
-ðŸŸ¢ Floor 1 CO2: 987 ppm max (â†“ 78 ppm vs avg)
-           PM2.5: 11 Î¼g/mÂ³ max (â†’ stable)
-ðŸŸ¢ Floor 2 CO2: 1,089 ppm max (â†‘ 45 ppm vs avg)
-           PM2.5: 9 Î¼g/mÂ³ max (â†“ better)
+🟢 Floor 1 CO2: 987 ppm max (↓ 78 ppm vs avg)
+           PM2.5: 11 μg/m³ max (→ stable)
+🟢 Floor 2 CO2: 1,089 ppm max (↑ 45 ppm vs avg)
+           PM2.5: 9 μg/m³ max (↓ better)
 
 PM2.5 filtration: 0 events, 0 min runtime
 Trend: -2 events vs 7-day avg (better)
 
-âœ“ Excellent air quality all day
+✓ Excellent air quality all day
 ```
 
 **Trend Indicators:**
-- CO2: â†‘/â†“ shown if difference > 100 ppm, â†’ if stable
-- PM2.5: â†‘ worse if +10 Î¼g/mÂ³, â†“ better if -10 Î¼g/mÂ³, â†’ stable otherwise
+- CO2: ↑/↓ shown if difference > 100 ppm, → if stable
+- PM2.5: ↑ worse if +10 μg/m³, ↓ better if -10 μg/m³, → stable otherwise
 
 **Emoji Logic:**
-- ðŸŸ¢ Green: CO2 < 1200 ppm AND PM2.5 < 35 Î¼g/mÂ³
-- ðŸŸ¡ Yellow: CO2 1200-2000 ppm OR PM2.5 35-55 Î¼g/mÂ³
-- ðŸ”´ Red: CO2 > 2000 ppm OR PM2.5 > 55 Î¼g/mÂ³
+- 🟢 Green: CO2 < 1200 ppm AND PM2.5 < 35 μg/m³
+- 🟡 Yellow: CO2 1200-2000 ppm OR PM2.5 35-55 μg/m³
+- 🔴 Red: CO2 > 2000 ppm OR PM2.5 > 55 μg/m³
 
 ---
 
@@ -257,11 +235,6 @@ Trend: -2 events vs 7-day avg (better)
 - Can turn OFF via automation (`switch.vent_hood_reset`)
 - Cannot turn ON via automation (manual control only)
 
-**Integration Logic:**
-- CO2 ventilation pauses if kitchen hood is detected OFF (to avoid fighting it)
-- Party mode deactivation turns hood OFF after 30-minute delay
-- Daily reset automation (5:00 AM) maintains hood operation
-
 ---
 
 ## Dashboard & Monitoring
@@ -270,13 +243,12 @@ Trend: -2 events vs 7-day avg (better)
 
 **Sensors:**
 - `sensor.living_area_co2` - Living area CO2 (ppm)
-- `sensor.living_area_pm25` - Living area PM2.5 (Î¼g/mÂ³)
+- `sensor.living_area_pm25` - Living area PM2.5 (μg/m³)
 - `sensor.master_bedroom_co2` - Master bedroom CO2 (ppm)
-- `sensor.master_bedroom_pm25` - Master bedroom PM2.5 (Î¼g/mÂ³)
+- `sensor.master_bedroom_pm25` - Master bedroom PM2.5 (μg/m³)
 
 **Status Indicators:**
 - `input_boolean.pm25_filtration_active` - PM2.5 filtration running
-- `input_boolean.party_mode` - Party mode active
 
 **Daily Statistics:**
 - `input_number.living_area_co2_max_today` - Daily max CO2 (Floor 1)
@@ -336,7 +308,7 @@ entities:
 **Symptom:** HVAC fan won't return to AUTO mode
 
 **Check:**
-1. Current PM2.5 readings - are both sensors <12 Î¼g/mÂ³?
+1. Current PM2.5 readings - are both sensors <12 μg/m³?
 2. Filtration duration - has it been running for 15+ minutes?
 3. Sensor status - are sensors online and reporting?
 
@@ -353,11 +325,9 @@ entities:
 **Check:**
 1. Occupancy - high occupancy naturally elevates CO2
 2. Ventilation - are windows closed during occupied periods?
-3. Party mode - is it enabled when not needed?
 
 **Solutions:**
 - Open windows periodically during high occupancy
-- Use party mode during gatherings for enhanced monitoring
 - Adjust threshold in automation if desired (currently 1000 ppm)
 - Consider HVAC fresh air intake if available
 
@@ -419,9 +389,9 @@ entities:
 
 **IKEA Alpstuga:**
 - CO2 Range: 400-5000 ppm
-- PM2.5 Range: 0-500 Î¼g/mÂ³
+- PM2.5 Range: 0-500 μg/m³
 - Update Frequency: ~60 seconds
-- Accuracy: Â±50 ppm (CO2), Â±10% (PM2.5)
+- Accuracy: ±50 ppm (CO2), ±10% (PM2.5)
 - Power: Battery or USB
 - Communication: Thread (requires Thread border router, e.g., HomePod mini or Apple TV 4K)
 
@@ -443,12 +413,11 @@ entities:
 1. **IKEA Alpstuga Sensors** - Use Thread protocol; require a Thread border router (e.g., HomePod mini or Apple TV 4K)
 2. **PM2.5 Priority** - Always takes precedence over other HVAC fan automation
 3. **Pushover Notifications** - Four-tier system provides appropriate alert levels
-4. **Party Mode** - Manual toggle for enhanced monitoring during gatherings
 
 **If Replacing Sensors:**
 1. Any air quality sensor can be used with entity ID updates in automation
 2. Update entity IDs in `airquality.yaml`
-3. Ensure new sensors provide CO2 (ppm) and PM2.5 (Î¼g/mÂ³) readings
+3. Ensure new sensors provide CO2 (ppm) and PM2.5 (μg/m³) readings
 4. Test thresholds with new sensor accuracy specifications
 
 **If Replacing Home Assistant:**
@@ -466,6 +435,6 @@ entities:
 
 ---
 
-**Last Updated:** February 2026  
-**Package File:** `airquality.yaml`  
+**Last Updated:** April 2026
+**Package File:** `airquality.yaml`
 **Document Maintainer:** Homeowner

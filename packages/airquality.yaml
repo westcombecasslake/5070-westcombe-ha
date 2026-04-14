@@ -10,13 +10,12 @@
 # FEATURES:
 # * PM2.5 filtration takes priority over all other HVAC fan automation
 # * CO2 managed via exhaust ventilation when PM2.5 levels allow
-# * Party mode enhanced monitoring with periodic reminders
 # * Daily air quality summaries with trend comparison
 # * Sensor offline detection
 # * Four-tier Pushover notification system
 #
 # HARDWARE:
-# * 2x IKEA Alpstuga sensors (CO2, PM2.5, TVOC)
+# * 2x IKEA Alpstuga sensors (CO2, PM2.5)
 #   - Floor 1: Living area (sensor.living_area_co2, sensor.living_area_pm25)
 #   - Floor 2: Master bedroom (sensor.master_bedroom_co2, sensor.master_bedroom_pm25)
 # * HVAC fan with HEPA 13 + carbon filter (climate.ecobee via script)
@@ -53,10 +52,6 @@ input_boolean:
   pm25_filtration_active:
     name: PM2.5 Filtration Active
     icon: mdi:air-filter
-
-  party_mode:
-    name: Party Mode
-    icon: mdi:party-popper
 
 input_text:
   pm25_status:
@@ -385,6 +380,7 @@ automation:
   #
   # Returns to AUTO after 4 hours of continuous filtration
   # to prevent excessive HVAC runtime if sensor stuck.
+  # Logs actual elapsed runtime rather than hardcoded value.
   # --------------------------------------------------
   - id: air_quality_pm25_safety_timeout
     alias: "Air Quality - PM2.5 Safety Timeout"
@@ -394,12 +390,16 @@ automation:
         to: "on"
         for: "04:00:00"
     action:
-      # Add 240 minutes (4 hours) to runtime
+      # Calculate actual elapsed runtime
+      - variables:
+          runtime_minutes: "{{ ((as_timestamp(now()) - states('input_number.pm25_filtration_start_time')|float(0)) / 60) | round(0) }}"
+
+      # Add actual runtime to today's total
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filtration_runtime_today
         data:
-          value: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) + 240 }}"
+          value: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) + runtime_minutes|int(0) }}"
 
       # Deactivate
       - service: input_boolean.turn_off
@@ -426,6 +426,7 @@ automation:
           title: "⚠️ PM2.5 Filtration Timeout"
           message: |
             4-hour filtration limit reached
+            Runtime logged: {{ runtime_minutes }} minutes
             Current levels:
             Floor 1: {{ states('sensor.living_area_pm25') }} μg/m³
             Floor 2: {{ states('sensor.master_bedroom_pm25') }} μg/m³
@@ -465,9 +466,10 @@ automation:
             Consider evacuating room
 
   # --------------------------------------------------
-  # CO2 — High Level (Ventilation Needed)
+  # CO2 — High Level Living Area (Ventilation Needed)
   #
   # Runs HVAC exhaust boost and notifies to open windows.
+  # Severity-based guidance tells resident how much to open.
   # Only when PM2.5 filtration is NOT active.
   # --------------------------------------------------
   - id: air_quality_co2_high_living_area
@@ -478,30 +480,26 @@ automation:
         above: 1000
         for: "00:05:00"
     condition:
-      # Don't run exhaust during PM2.5 filtration
       - condition: state
         entity_id: input_boolean.pm25_filtration_active
         state: "off"
-      # Don't fight kitchen hood if it's running
-      - condition: state
-        entity_id: switch.vent_hood_reset
-        state: "on"
     action:
-      # Run HVAC exhaust boost
       - service: script.hvac_exhaust_boost
-
-      # Notify about opening windows
       - service: notify.house_notices
         data:
-          title: "🪟 Open Windows"
+          title: "🪟 Open Windows - CO2 Elevated"
           message: |
             CO2: {{ states('sensor.living_area_co2') }} ppm
-            Location: Living Area
+            {% set co2 = states('sensor.living_area_co2')|int(0) %}
+            {% if co2 > 1500 %}Level: Poor - open doors and windows
+            {% else %}Level: Moderate - open a window
+            {% endif %}
             Outdoor temp: {{ states('sensor.ecobee_outdoor_temperature') }}°F
-            
-            Opening windows recommended
             HVAC exhaust boost running (20 min)
 
+  # --------------------------------------------------
+  # CO2 — High Level Master Bedroom
+  # --------------------------------------------------
   - id: air_quality_co2_high_master_bedroom
     alias: "Air Quality - CO2 High Master Bedroom"
     trigger:
@@ -541,108 +539,6 @@ automation:
             
             Master bath fan running (20 min)
             Consider opening window
-
-# ==================================================
-# Party Mode Integration
-# ==================================================
-
-  # --------------------------------------------------
-  # Party Mode — Activate
-  #
-  # Enhanced ventilation when party mode enabled.
-  # --------------------------------------------------
-  - id: air_quality_party_mode_activate
-    alias: "Air Quality - Party Mode Activate"
-    trigger:
-      - platform: state
-        entity_id: input_boolean.party_mode
-        to: "on"
-    action:
-      # Aggressive ventilation
-      - service: script.hvac_exhaust_boost
-
-      # Additional exhaust fan
-      - service: light.turn_on
-        target:
-          entity_id: light.entry_bath_fan
-
-      # Notify
-      - service: notify.house_notices
-        data:
-          title: "🎉 Party Mode Active"
-          message: |
-            Enhanced ventilation activated
-            HVAC exhaust boost running
-            Entry bath fan on
-            
-            Air quality monitoring increased
-
-  # --------------------------------------------------
-  # Party Mode — Periodic CO2 Check
-  #
-  # Checks air quality every 15 minutes during party.
-  # Reminds to open windows if CO2 elevated.
-  # --------------------------------------------------
-  - id: air_quality_party_mode_co2_check
-    alias: "Air Quality - Party Mode CO2 Check"
-    trigger:
-      - platform: time_pattern
-        minutes: "/15"
-    condition:
-      - condition: state
-        entity_id: input_boolean.party_mode
-        state: "on"
-      - condition: numeric_state
-        entity_id: sensor.living_area_co2
-        above: 1200
-    action:
-      # Run another exhaust boost
-      - service: script.hvac_exhaust_boost
-
-      # Remind about windows
-      - service: notify.house_notices
-        data:
-          title: "🎉 Party Air Quality Check"
-          message: |
-            CO2: {{ states('sensor.living_area_co2') }} ppm
-            Time: {{ now().strftime('%I:%M %p') }}
-            
-            Consider opening windows/doors
-            HVAC boost cycling every 15 min
-
-  # --------------------------------------------------
-  # Party Mode — Deactivate Cleanup
-  #
-  # Turns off kitchen hood after party ends.
-  # Runs final exhaust boost.
-  # --------------------------------------------------
-  - id: air_quality_party_mode_deactivate
-    alias: "Air Quality - Party Mode Deactivate"
-    trigger:
-      - platform: state
-        entity_id: input_boolean.party_mode
-        to: "off"
-        for: "00:30:00"
-    action:
-      # Turn off kitchen hood
-      - service: switch.turn_off
-        target:
-          entity_id: switch.vent_hood_reset
-
-      # Final exhaust boost
-      - service: script.hvac_exhaust_boost
-
-      # Notify
-      - service: notify.operational_log
-        data:
-          title: "🎉 Party Mode Ended"
-          message: |
-            Final air quality reading:
-            CO2: {{ states('sensor.living_area_co2') }} ppm
-            PM2.5: {{ states('sensor.living_area_pm25') }} μg/m³
-            
-            Kitchen hood turned off
-            Final exhaust boost running
 
 # ==================================================
 # Daily Statistics & Reporting

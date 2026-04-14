@@ -1,14 +1,18 @@
 # Garage Systems
 
-**Last Updated:** February 2026
+**Last Updated:** April 2026
 
 ---
 
 ## Overview
 
-The Garage Systems subsystem provides motion- and door-activated lighting for safety and convenience, plus freezing temperature monitoring to protect against pipe freeze damage. Both functions operate independently - lighting for daily usability and temperature alerts for property protection during cold weather.
+The Garage Systems subsystem provides three independent functions:
 
-Motion- and door-activated lighting uses Insteon native scenes with Home Assistant enforcing timed shutoff, ensuring lights turn on immediately when motion is detected or a door is opened, and automatically turn off after 10 minutes. Temperature monitoring sends repeating alerts if the garage remains at or below freezing for extended periods.
+- **Motion/door-activated lighting** for safety and convenience
+- **Freezing temperature monitoring** to protect against pipe freeze damage
+- **Away mode sensor monitoring** with Pushover alerts when vacation mode is active
+
+Lighting and temperature alerts operate continuously. Away monitoring is user-controlled via the `vacation_mode` helper and only activates when enabled.
 
 ---
 
@@ -105,9 +109,70 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 
 ---
 
+## Away Mode Sensor Monitoring
+
+### What It Does
+
+When vacation mode is active, monitors all three garage sensors (motion and both doors) and sends Pushover alerts via House Alerts. Designed to inform without spamming — the first trigger sends an immediate alert, and subsequent activity is counted and summarized every 30 minutes. The monitoring session automatically resets if no new activity occurs for 1.5 hours, and fully resets when vacation mode is turned off.
+
+**Rationale:** The garage is locked and closed when away. Any sensor activity warrants awareness but repeated alerts for sustained activity (wind, sensor drift, wildlife) would be disruptive. The summary approach balances awareness with noise control.
+
+### Alert Behavior
+
+1. **First trigger:** Immediate notification identifying which sensor fired
+2. **Subsequent triggers:** Counted silently
+3. **Every 30 minutes:** Summary sent only if new activity occurred since last summary ("X additional detection(s) in the last 30 minutes")
+4. **No activity for 1.5 hours:** Session ends, all state resets automatically
+5. **Vacation mode turned off:** Full reset regardless of session state
+
+### Helpers
+
+| Helper | Entity | Purpose |
+|--------|--------|---------|
+| Vacation Mode | `input_boolean.vacation_mode` | User-controlled master switch for all away mode features. Shared with lighting_indoor.yaml |
+| Garage Away Alert Active | `input_boolean.garage_away_alert_active` | Tracks whether a monitoring session is currently armed |
+| Garage Away Trigger Count | `input_number.garage_away_trigger_count` | Counts additional sensor triggers after first alert |
+| Garage Away Last Trigger | `input_datetime.garage_away_last_trigger` | Timestamps last trigger for 1.5-hour inactivity check |
+
+### Key Entities
+
+**Sensors (shared with lighting automation):**
+- `binary_sensor.garage_motion`
+- `binary_sensor.back_yard_garage`
+- `binary_sensor.entry_door_garage`
+
+### Automations
+
+**Garage Away Mode Sensor Trigger:**
+- ID: `garage_away_sensor_trigger`
+- Alias: `Garage - Away Mode Sensor Trigger`
+- Trigger: Any of the 3 sensors goes on
+- Condition: `input_boolean.vacation_mode` is on
+- Mode: Queued
+- Action: Stamps last trigger time; if first trigger arms the session and sends alert; if already armed increments the counter
+
+**Garage Away Mode Summary Loop:**
+- ID: `garage_away_summary_loop`
+- Alias: `Garage - Away Mode Summary Loop`
+- Trigger: `garage_away_alert_active` turns on
+- Mode: Single
+- Action: Loops every 30 minutes; exits and resets if no activity for 1.5 hours; sends summary if counter > 0; stays quiet if counter = 0
+
+**Garage Away Mode Reset:**
+- ID: `garage_away_reset_on_exit`
+- Alias: `Garage - Reset Away Alert on Vacation Mode Off`
+- Trigger: `vacation_mode` turns off
+- Action: Turns off alert active boolean, resets trigger counter
+
+**YAML:** garage.yaml
+
+---
+
 ## User Controls
 
-**Access:** No user-adjustable controls for garage systems
+| Control | Entity | Access | Purpose |
+|---------|--------|--------|---------|
+| Vacation Mode | `input_boolean.vacation_mode` | Android home screen widget | Enables/disables all away mode monitoring and lighting simulation across the house |
 
 **Manual Overrides:**
 - Scene 20 can be manually activated/deactivated via Insteon controls
@@ -118,23 +183,31 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 ## Notifications
 
 **Pushover House Alerts** (`notify.house_alerts`):
-- Garage temperature below freezing for 1+ hours
-- Repeats every 2 hours while condition persists
-- Priority: High (action may be required to prevent damage)
+
+| Alert | Condition | Repeat |
+|-------|-----------|--------|
+| Garage Below Freezing | Temperature <= 32F for 1+ hours | Every 2 hours while below freezing |
+| Garage Activity While Away | First sensor trigger during vacation mode | Once per session |
+| Garage Activity Update | Additional triggers during vacation mode | Every 30 minutes if new activity occurred |
 
 ---
 
 ## Related Systems
 
 **YoLink Sensors:**
-- Motion sensor for lighting automation
-- Door sensors for lighting automation
+- Motion sensor for lighting and away monitoring
+- Door sensors for lighting and away monitoring
 - Temperature sensor for freeze alerts
 - See: yolink-integration.md
 
 **Insteon Scenes:**
 - Scene 20: Garage lighting
 - See: insteon-scenes.md
+
+**Vacation Mode:**
+- `input_boolean.vacation_mode` is declared in garage.yaml and shared with lighting_indoor.yaml
+- Away mode lighting simulation (living room, master bedroom) also uses this helper
+- See: lighting-indoor.md
 
 **Battery Monitoring:**
 - Motion sensor, door sensors, and temperature sensor batteries monitored separately
@@ -157,28 +230,24 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 - Scene 20 can always be manually deactivated
 - Backup deactivation occurs 3 seconds after first attempt
 
-**Lights turn off too quickly:**
-- Each motion detection or door open resets the 10-minute timer
-- If motion or door activity continues, lights should stay on
-- Check motion sensor sensitivity in YoLink app
-- 10-minute delay is fixed (not user-adjustable without YAML edit)
-
 **Freezing alerts not received:**
 - Verify temperature sensor is reporting correctly
 - Check temperature must be <=32F for full hour before first alert
 - Confirm Pushover House Alerts service is functioning
 - Check entity name in garage.yaml matches actual sensor
 
-**Too many freezing alerts:**
-- Alerts repeat every 2 hours while below freezing
-- This is intentional - ensures condition isn't forgotten
-- No way to disable while still freezing (safety feature)
-- Take action to warm garage or insulate pipes
+**Away alerts not firing:**
+- Confirm `input_boolean.vacation_mode` is on
+- Check `input_boolean.garage_away_alert_active` state in Developer Tools
+- If boolean is stuck on after returning home, turn vacation mode off to force reset
+- Verify all three sensor entities are reporting correctly
+
+**Away alerts firing when not away:**
+- Confirm vacation mode was turned off after returning home
+- Widget on Android home screen should show current state
 
 ---
 
 ## YAML Packages
 
 - `/config/packages/garage.yaml`
-
----

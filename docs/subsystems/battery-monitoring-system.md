@@ -2,7 +2,7 @@
 
 ## Overview
 
-The battery monitoring system tracks all 24 battery-powered devices in the home automation system and sends tiered alerts based on battery levels. The system uses a two-tier notification strategy that separates early warnings from critical alerts.
+The battery monitoring system tracks all battery-powered devices in the home automation system and sends alerts based on battery levels. Devices are auto-discovered by `device_class: battery` — no hardcoded entity list is required, and new devices are included automatically. Mobile devices (phones, tablets) are excluded from all monitoring.
 
 ---
 
@@ -15,15 +15,15 @@ The battery monitoring system tracks all 24 battery-powered devices in the home 
 **Key Components:**
 1. **Input Text Helper** - `input_text.battery_status` for Android Auto display
 2. **Scripts** - Manual reporting and status updates
-3. **Automations** - Automatic battery monitoring and alerting (3 automations)
+3. **Automations** - Automatic battery monitoring and alerting (1 automation)
 
 **Dependencies:**
-- Pushover integration (`notify.battery_alerts` and `notify.house_alerts`)
-- All battery sensors from YoLink and Ring devices
+- Pushover integration (`notify.battery_alerts`)
+- All battery sensors discovered via `device_class: battery` (mobile devices excluded)
 
 ---
 
-## Two-Tier Alert System
+## Alert System
 
 ### Alert Routing Strategy
 
@@ -33,80 +33,51 @@ The battery monitoring system tracks all 24 battery-powered devices in the home 
 +-------------------------------------------------------------+
                             |
                             v
-                    Battery Level?
+              Nightly poll at 23:55 — all sensors
                             |
             +---------------+---------------+
-            |               |               |
-            v               v               v
-         > 30%          15-30%           < 15%
-            |               |               |
-            |               v               v
-            |      +-----------------+  +-----------------+
-            |      | Battery Alerts  |  |  House Alerts   |
-            |      |   (Normal 0)    |  |   (High 1)      |
-            |      +-----------------+  +-----------------+
-            |               |               |
-            |               v               v
-            |      Low Battery Warning  CRITICAL Battery Alert
-            |      Order replacement   REPLACE IMMEDIATELY
+            |                               |
+            v                               v
+    Battery <= 25% or unavailable       All batteries > 25%
+            |                               |
+            v                               v
+   +-----------------+                  No notification
+   | Battery Alerts  |                  (silent night)
+   |   (Normal 0)    |
+   +-----------------+
             |
             v
-        No Alert
+   Consolidated alert listing
+   all affected devices
 ```
 
-### 30% Low Battery Warning
+### 25% Battery Alert
 
 **Service:** `notify.battery_alerts`
 **Priority:** Normal (0)
-**Trigger:** Battery drops below 30%
+**Trigger:** Nightly poll at 23:55 finds one or more sensors at ≤25% or unavailable
 **Purpose:** Early warning to order replacement batteries
 **Time to Act:** Several weeks to months
 
 **Notification Example:**
 ```
-Title: Low Battery Warning
-Message: Device: Front Door
-         Battery Level: 28%
-
-         Order replacement battery
+Title: Battery Alert
+Message: Front Door: 22%
+         Sump Pump Running Sensor: 18%
+         Hot Water Heater Leak Sensor: Unavailable
 ```
 
 **Characteristics:**
+- Single consolidated notification listing all affected devices
 - Standard notification tone
-- Can use quiet hours
-- Review at your convenience
+- Silent when all batteries are above 25%
 - Gives advance planning time
-
-### 15% Critical Battery Alert
-
-**Service:** `notify.house_alerts` (SAME AS SMOKE/CO/SUMP FAILURES)
-**Priority:** High (1)
-**Trigger:** Battery drops below 15%
-**Purpose:** Urgent warning - replace immediately
-**Time to Act:** Days to weeks
-
-**Notification Example:**
-```
-Title: CRITICAL Battery Alert
-Message: Device: Front Door
-         Battery Level: 12%
-
-         REPLACE IMMEDIATELY
-```
-
-**Characteristics:**
-- Loud siren tone (same as smoke detector alerts)
-- Persistent vibration
-- NO quiet hours - bypasses sleep mode
-- Cannot be casually dismissed
-- Treated as house emergency
-
-**Rationale:**
-A smoke detector at 12% battery is a safety issue that deserves the same urgency as actual smoke detection. Critical battery failures can compromise home safety and security systems.
 
 ---
 
-## Monitored Devices (24 Total)
+## Monitored Devices
+
+Devices are auto-discovered via `device_class: battery`. The list below reflects current known devices but does not need to be maintained manually — any new device with a battery sensor is included automatically.
 
 ### Safety-Critical Devices (9)
 1. Basement Smoke/CO
@@ -180,51 +151,39 @@ A smoke detector at 12% battery is a safety issue that deserves the same urgency
 
 ## Automation Details
 
-### 1. 30% Low Battery Warning
+### 1. Nightly Battery Check
 ```yaml
-ID: battery_low_30_percent
-Mode: parallel (multiple devices can alert simultaneously)
-Trigger: Battery < 30% for 5 minutes
-Condition: Battery > 15% (avoids duplicate with critical alert)
+ID: battery_daily_check
+Alias: "Battery - Daily Check"
+Trigger: 23:55 daily
 Action:
-  - Send notification to Battery Alerts
-  - Update battery status helper
-```
-
-### 2. 15% Critical Battery Alert
-```yaml
-ID: battery_critical_15_percent
-Mode: parallel
-Trigger: Battery < 15% for 5 minutes
-Action:
-  - Send notification to House Alerts (HIGH PRIORITY)
-  - Update battery status helper
-```
-
-### 3. Daily Battery Status Update
-```yaml
-ID: battery_status_daily_update
-Trigger: 8:00 AM daily
-Action: Update input_text.battery_status helper
-Purpose: Keep Android Auto display current
+  1. Run script.update_battery_status (updates helper regardless of battery state)
+  2. Build consolidated message of all sensors <= 25% or unavailable
+  3. Condition: only proceed if message is non-empty
+  4. Send notification to Battery Alerts
 ```
 
 ### Design Patterns
 
-**5-Minute Delay:**
-- Prevents false alerts from temporary glitches
-- Ensures stable low battery reading
-- Reduces noise from sensor initialization
+**Scheduled Poll (not event-driven):**
+- Runs once nightly at 23:55
+- Checks all battery sensors at that moment
+- No per-event triggers or delays
 
-**Parallel Mode:**
-- Multiple batteries can alert simultaneously
-- Each device gets its own notification
-- Important for tracking multiple low batteries
+**Consolidated Notification:**
+- All affected devices listed in a single message
+- Notification only sent when at least one device needs attention
+- Silent when everything is healthy — no false reassurance messages
+
+**Auto-Discovery:**
+- Uses `device_class: battery` to find all battery sensors automatically
+- Mobile devices excluded via `integration_entities('mobile_app')`
+- New devices included without any configuration changes
 
 **Template Usage:**
-- `{{ trigger.entity_id }}` - Which sensor triggered
-- `{{ state_attr(trigger.entity_id, 'friendly_name') }}` - Device name
-- `{{ states(trigger.entity_id) }}` - Current battery level
+- Iterates `states.sensor` filtered by `device_class: battery`
+- `device_name(sensor.entity_id)` — human-readable device name
+- `sensor.state` — current battery percentage or `unavailable`
 
 ---
 
@@ -237,14 +196,13 @@ Provides at-a-glance battery system status for:
 - Automation conditions
 
 ### States
-- **Normal** - All batteries above 30%
-- **Low** - One or more batteries below 30%
-- **Critical** - One or more batteries below 15%
+- **Normal** - All batteries above 25% and online
+- **Low** - One or more batteries at or below 25%
+- **Offline** - One or more sensors reporting unavailable (takes priority over Low)
 
 ### Update Schedule
-- Automatically updated by all battery automations
-- Daily refresh at 8:00 AM
-- Updated on system startup
+- Updated by the nightly battery check automation (23:55)
+- Updated whenever `script.update_battery_status` is run manually
 
 ---
 
@@ -252,35 +210,24 @@ Provides at-a-glance battery system status for:
 
 ### Manual Testing
 
-**Test Battery Alerts (30% Warning):**
+**Test Battery Alerts:**
 ```
 Developer Tools -> Services
 Service: notify.battery_alerts
 Data:
-  title: "Test: Low Battery Warning"
-  message: "Testing 30% alert routing"
-```
-
-**Test House Alerts (15% Critical):**
-```
-Developer Tools -> Services
-Service: notify.house_alerts
-Data:
-  title: "Test: CRITICAL Battery"
-  message: "Testing 15% alert routing - should be LOUD"
+  title: "Test: Battery Alert"
+  message: "Testing 25% alert routing"
 ```
 
 ### Verification Checklist
-1. Check Pushover app - two separate buckets
-2. Confirm 30% test in **Battery Alerts** bucket
-3. Confirm 15% test in **House Alerts** bucket
-4. Verify House Alerts has loud/persistent sound
-5. Verify no quiet hours on House Alerts
+1. Check Pushover app — Battery Alerts bucket
+2. Confirm test notification appears in **Battery Alerts** bucket
+3. Verify tone and delivery behavior
 
 ### Automation Traces
 ```
 Developer Tools -> Automations
-Find: "Battery - 30% Low Warning"
+Find: "Battery - Daily Check"
 View Traces -> Check last trigger details
 ```
 
@@ -290,15 +237,14 @@ View Traces -> Check last trigger details
 
 ### When to Replace
 
-**30% Warning Received:**
+**25% Alert Received:**
 - Order replacement batteries
 - No immediate action required
 - Plan replacement within 4-8 weeks
 
-**15% Critical Alert Received:**
-- Replace within 3-7 days
-- Device may fail soon
-- Prioritize safety-critical devices
+**Sensor Reporting Unavailable:**
+- Check device is powered and within range
+- Replace battery promptly — device may have already failed
 
 ### Battery Types Required
 
@@ -330,13 +276,13 @@ View Traces -> Check last trigger details
 3. Remove old battery
 4. Install fresh battery
 5. Test device operation
-6. Verify recovery notification (battery > 50%)
+6. Verify recovery (device no longer appears in next nightly report)
 
 **Safety-Critical Devices (Smoke/CO):**
 1. Replace battery
 2. Press test button to verify
 3. Confirm sensor LED flash
-4. Monitor for recovery notification
+4. Monitor for recovery in next nightly report
 5. Document replacement date
 
 ---
@@ -349,7 +295,7 @@ View Traces -> Check last trigger details
 ```
 Settings -> Automations
 Search: "Battery"
-Verify all 3 automations are enabled
+Verify automation is enabled
 ```
 
 **Check Battery Sensor:**
@@ -367,6 +313,10 @@ Verify integration loaded successfully
 Test with Developer Tools -> Services
 ```
 
+**Check Notification Condition:**
+- Notification only fires when at least one device is ≤25% or unavailable
+- If all batteries are healthy, no notification is sent — this is expected behavior
+
 ### False Alerts
 
 **Symptoms:** Alert received but battery actually fine
@@ -377,7 +327,6 @@ Test with Developer Tools -> Services
 - Sensor initialization after restart
 
 **Solutions:**
-- Wait 5 minutes - automation has built-in delay
 - Check actual battery level in States
 - If persistent, replace battery preemptively
 
@@ -386,93 +335,59 @@ Test with Developer Tools -> Services
 **Symptoms:** Battery failed but no notification received
 
 **Check:**
-1. Battery sensor entity appears in the trigger entity list of the `battery_low_30_percent` automation in batteryalerts.yaml
-2. Automation is enabled
-3. Pushover service configured correctly
-4. Battery dropped below threshold gradually (5-min delay)
+1. Battery sensor entity has `device_class: battery` attribute
+2. Entity is not from the `mobile_app` integration
+3. Automation is enabled
+4. Pushover service configured correctly
 
 **Temporary Fix:**
 - Run manual battery report script
-- Enable daily status updates
+- Check `input_text.battery_status` for current state
 
 ---
 
 ## Maintenance Schedule
 
 ### Daily (Automatic)
-- Battery status helper updates at 8:00 AM
-- Monitors all 24 devices continuously
+- Battery check and notification runs at 23:55
+- Monitors all auto-discovered battery sensors continuously
 
 ### Weekly (Manual)
-- Review Battery Alerts bucket for 30% warnings
+- Review Battery Alerts bucket for 25% warnings
 - Order replacement batteries if needed
 
 ### Monthly (Manual)
 - Test one smoke/CO detector manually
 - Verify alert received in Pushover
-- Check battery status report
+- Run manual battery status report
 
 ### Annually (Manual)
 - Review battery replacement schedule
 - Replace aging batteries preemptively (3+ years old)
 - Update battery inventory
-- Test all 3 automations with manual triggers
+- Test automation with manual trigger
 
 ---
 
 ## Integration with Other Systems
 
 ### Android Auto Display
-- `input_text.battery_status` shows: Normal, Low, or Critical
-- Updates automatically via automations
+- `input_text.battery_status` shows: Normal, Low, or Offline
+- Updated nightly by the battery check automation
 - Quick at-a-glance status while driving
 
 ### System Startup
-- Battery status updated on Home Assistant restart
+- Verify `systemstartup.yaml` calls `script.update_battery_status` on restart
 - Ensures status helper is current after system changes
-- Called by `systemstartup.yaml`
 
 ### Safety Monitoring Package
-- Smoke/CO detector batteries monitored
-- Critical alerts ensure life safety devices operational
+- Smoke/CO detector batteries monitored via auto-discovery
 - Integrated with smoke/CO offline monitoring
 
 ### Sump Pump Monitoring
-- Sump sensor batteries monitored
+- Sump sensor batteries monitored via auto-discovery
 - Critical for backup pump failure detection
 - Prevents basement flooding
-
----
-
-## Why This Configuration Works
-
-### Proactive + Insistent = Effective
-
-**30% Warning (Proactive):**
-- Gives weeks of advance notice
-- Time to order batteries in bulk
-- Reduce emergency late-night battery runs
-- Review at your convenience
-
-**15% Critical (Insistent):**
-- Cannot be ignored or forgotten
-- Same priority as smoke detector alerts
-- Wakes you up if needed
-- Multiple critical batteries = immediate action
-
-### Organized by Urgency
-
-**Battery Alerts Bucket:**
-- All routine battery maintenance
-- 30% warnings
-- Replacement confirmations
-- Review daily or weekly
-
-**House Alerts Bucket:**
-- Only critical emergencies
-- 15% critical batteries alongside smoke/CO/leaks
-- Review immediately
-- Cannot be silenced
 
 ---
 
@@ -511,8 +426,8 @@ Entity: input_text.battery_status
 
 **Package File:** `/config/packages/batteryalerts.yaml`
 **Integration:** Settings -> Integrations -> Pushover
-**Monitored Sensors:** 24 entities ending in `_battery`
-**Not Monitored:** Ecobee remote sensor (binary HomeKit reporting)
+**Monitored Sensors:** All entities with `device_class: battery`, excluding `mobile_app`
+**Not Monitored:** Ecobee remote sensor (binary HomeKit reporting), mobile devices
 
 ### Support
 
@@ -523,7 +438,7 @@ Entity: input_text.battery_status
 ---
 
 **Document Status:** Current and Complete
-**Last Updated:** February 2026
-**System Status:** Fully operational with 24 monitored devices
-**Configuration:** Two-tier alerting (30% -> Battery Alerts, 15% -> House Alerts)
-**Note:** Ecobee remote sensor (Master Bedroom) not monitored - replace CR2032 when sensor stops responding
+**Last Updated:** April 2026
+**System Status:** Fully operational — auto-discovery via device_class: battery
+**Configuration:** Single-tier alerting (≤25% or unavailable → Battery Alerts at 23:55)
+**Note:** Ecobee remote sensor (Master Bedroom) not monitored — replace CR2032 when sensor stops responding
