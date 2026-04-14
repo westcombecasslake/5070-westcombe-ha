@@ -31,7 +31,7 @@
 # * Maintenance reminder -> Pushover House Alerts (Feb 1 & Aug 1)
 #
 ###############################################################################
-
+ 
 input_number:
   ###############################################################################
   # SEASONAL PHOTOCELL DELAY ADJUSTMENTS
@@ -46,35 +46,35 @@ input_number:
   #
   # Access via: Settings -> Devices & Services -> Helpers
   ###############################################################################
-
+ 
   premise_summer_delay:
     name: Premise Summer Delay (May-Jul)
     min: 0
     max: 45
     step: 1
     unit_of_measurement: "min"
-
+ 
   premise_shoulder_delay:
     name: Premise Shoulder Season Delay (Apr/Aug)
     min: 0
     max: 45
     step: 1
     unit_of_measurement: "min"
-
+ 
   premise_spring_fall_delay:
     name: Premise Spring/Fall Delay (Mar/Sep)
     min: 0
     max: 45
     step: 1
     unit_of_measurement: "min"
-
+ 
   premise_winter_delay:
     name: Premise Winter Delay (Oct-Feb)
     min: 0
     max: 45
     step: 1
     unit_of_measurement: "min"
-
+ 
 input_boolean:
   ###############################################################################
   # FRONT MOTION ARMED FLAG
@@ -92,7 +92,7 @@ input_boolean:
   front_motion_armed:
     name: Front Motion Armed
     icon: mdi:motion-sensor
-
+ 
 automation:
   ###############################################################################
   # AUTOMATION: Daily Dawn Sensor Reset
@@ -117,7 +117,7 @@ automation:
       - action: switch.turn_on
         target:
           entity_id: switch.photocell_micro_module
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights - Dusk On
   #
@@ -168,7 +168,7 @@ automation:
             {% endif %}
       - delay:
           minutes: "{{ seasonal_delay | int }}"
-
+ 
       # Double-send: Critical exterior lighting activation at dusk
       # ensures property security and safety lighting reliability
       - action: insteon.scene_on
@@ -178,7 +178,7 @@ automation:
       - action: insteon.scene_on
         data:
           group: 21
-
+ 
       # Send notification AFTER lights activate (confirmation)
       - action: notify.operational_log
         data:
@@ -202,12 +202,12 @@ automation:
             Delay: {{ wait_min }} min
             Lights activated: {{ now().strftime('%I:%M %p') }}
             Actual dusk: {{ as_timestamp(state_attr('sun.sun', 'next_dusk')) | timestamp_custom('%I:%M %p') }}
-
+ 
       # Arm front motion: dusk has been confirmed, motion override now permitted
       - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.front_motion_armed
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights - Dusk Backup (Photocell Failure)
   #
@@ -250,12 +250,12 @@ automation:
       - action: insteon.scene_on
         data:
           group: 21
-
+ 
       # Arm front motion: backup dusk confirmed, motion override now permitted
       - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.front_motion_armed
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights - Dawn Off
   #
@@ -289,12 +289,12 @@ automation:
       - action: insteon.scene_off
         data:
           group: 21
-
+ 
       # Disarm front motion: dawn confirmed, block daytime motion triggers
       - action: input_boolean.turn_off
         target:
           entity_id: input_boolean.front_motion_armed
-
+ 
   ###############################################################################
   # AUTOMATION: Front Porch Motion Timer
   #
@@ -306,10 +306,10 @@ automation:
   #   Prevents daytime darkness (storms/overcast) from triggering lights
   # * Entry closet light must be OFF (indicates we're away/exterior lighting needed)
   #
-  # NOTIFICATION: Only sent once per motion session (when lights are currently off).
-  # Prevents duplicate notifications from Ring's redundant event pairs.
-  # A 2-second delay at action start lets mode:restart absorb the duplicate
-  # before the notification check runs.
+  # NOTIFICATION: Sent on every qualifying motion event.
+  # Ring may send duplicate events at the same timestamp; the 2-second delay
+  # at action start lets mode:restart absorb the duplicate before the
+  # notification fires, preventing double-alerts from a single motion trigger.
   #
   # RANDOM DELAY: 8-14 minutes (adds natural variation for security)
   #
@@ -341,13 +341,13 @@ automation:
       # Short delay: absorbs Ring's duplicate event pair via mode:restart.
       # Second event cancels first before reaching the notification check.
       - delay: "00:00:02"
-
+ 
       # Notification: motion detected at night
       - action: notify.house_alerts
         data:
           title: "Front Motion at Night"
           message: "{{ now().strftime('%I:%M %p') }}"
-
+ 
       # Double-send: Motion-triggered security lighting at night
       # ensures reliable activation when someone approaches
       - action: insteon.scene_on
@@ -368,7 +368,7 @@ automation:
       - action: insteon.scene_off
         data:
           group: 21
-
+ 
   ###############################################################################
   # AUTOMATION: Photocell Maintenance Reminder
   #
@@ -395,7 +395,7 @@ automation:
             Time for biannual photocell sensor maintenance
             Action: Unplug and replug photocell micro module
             Location: {{ now().strftime('%B') }} maintenance cycle
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights Night Off (Sun-Thu)
   #
@@ -428,7 +428,7 @@ automation:
       - action: insteon.scene_off
         data:
           group: 21
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights Night Off (Fri-Sat)
   #
@@ -464,7 +464,7 @@ automation:
       - action: insteon.scene_off
         data:
           group: 21
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights Backup Night Off (Sun-Thu)
   #
@@ -497,7 +497,7 @@ automation:
       - action: insteon.scene_off
         data:
           group: 21
-
+ 
   ###############################################################################
   # AUTOMATION: Premise Lights Backup Night Off (Fri-Sat)
   #

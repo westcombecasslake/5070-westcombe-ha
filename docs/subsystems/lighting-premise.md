@@ -1,6 +1,6 @@
 # Premise Lighting
 
-**Last Updated:** February 2026
+**Last Updated:** April 2026
 
 ---
 
@@ -35,7 +35,7 @@ Turns on all exterior premise lights when the photocell detects dusk, with seaso
 ### Key Entities
 
 **Sensors:**
-- `switch.photocell_micro_module` - Photocell state (on = dusk detected)
+- `switch.photocell_micro_module` - Photocell state (off = dusk detected, on = daylight)
 - `sun.sun` - Sun integration for backup failsafe
 
 **Helper Sensors:**
@@ -50,30 +50,30 @@ Turns on all exterior premise lights when the photocell detects dusk, with seaso
 ### Automations
 
 **Daily Photocell Sensor Reset:**
-- `premise_dusk_sensor_daily_reset`
+- `premise_dawn_sensor_daily_reset`
 - Trigger: 1:00 PM daily
-- Action: Cycles photocell module (off-on-off sequence)
+- Action: Cycles photocell module (off → 5-second delay → on)
 - Rationale: Clears analog sensor drift/confusion for reliable evening triggering
 
 **Dusk On (Primary):**
 - `premise_lights_dusk_on`
-- Trigger: Photocell detects dusk (`switch.photocell_micro_module` turns on)
-- Condition: Between 3:45 PM and 7:30 PM (prevents false triggers)
+- Trigger: Photocell detects dusk (`switch.photocell_micro_module` turns off)
+- Condition: After 3:45 PM and before sunset + 20 minutes (tracks sunset dynamically year-round); skips if `light.entry_closet_premise` is already on
 - Action: Apply seasonal delay, activate Insteon Scene 21 (double-send for reliability)
 - Notification: Pushover Operational Log with season, delay time, and actual dusk time
 
 **Dusk Backup (Failsafe):**
 - `premise_lights_dusk_backup`
 - Trigger: 15 minutes after sunset
-- Condition: Photocell still off AND premise lights still off AND sun below horizon
+- Condition: `light.entry_closet_premise` is still off (catches all failure modes regardless of cause)
 - Action: Activate Scene 21 (double-send), send HIGH priority alert
 - Notification: Pushover House Alerts - photocell failure detected
 
 **Dawn Off:**
 - `premise_lights_dawn_off`
-- Trigger: 15 minutes before sunrise
+- Trigger: Photocell detects dawn (`switch.photocell_micro_module` turns on)
+- Condition: Time window restricted to 1 hour before sunrise through 2 hours after sunrise — prevents evening photocell glitches (storms, clouds) from triggering a false dawn-off
 - Action: Deactivate Scene 21 (double-send)
-- Rationale: Turns off lights at dawn to save energy
 
 **YAML:** lightingpremise.yaml
 
@@ -103,8 +103,10 @@ Provides motion-activated lighting at the front porch when Ring doorbell detects
 
 **Sensors:**
 - `event.front_door_motion` - Ring doorbell motion detection events
-- `switch.photocell_micro_module` - Must be "on" (dark) for automation to trigger
 - `light.entry_closet_premise` - Checks if premise lights are currently off
+
+**Flags:**
+- `input_boolean.front_motion_armed` - Armed at dusk, cleared at dawn; blocks daytime motion triggers
 
 **User Controls:**
 - None (fully automatic)
@@ -117,9 +119,9 @@ Provides motion-activated lighting at the front porch when Ring doorbell detects
 - Condition:
   - `input_boolean.front_motion_armed` is on (set at dusk, cleared at dawn — blocks daytime darkness from storms/overcast)
   - `light.entry_closet_premise` is off (premise lights not already on)
-  - Not during photocell daily reset (12:58-1:01 PM guard window)
-- Action: 
-  - Send notification if lights were off (new motion session)
+  - Not during photocell daily reset (12:58–1:01 PM guard window)
+- Action:
+  - Send motion notification (Pushover House Alerts) — fires on every qualifying motion event
   - Activate Scene 21 (double-send for reliability)
   - Wait 8-14 minutes (randomized)
   - Deactivate Scene 21 (double-send)
@@ -127,31 +129,7 @@ Provides motion-activated lighting at the front porch when Ring doorbell detects
 - Rationale: Lights stay on continuously during motion, then turn off 8-14 minutes after LAST motion event
 
 **Note on Ring Motion Events:**
-Ring may send duplicate motion events (same timestamp), but `mode: restart` handles this gracefully by simply restarting the timer. This ensures reliable operation without requiring debouncing logic.
-
-**YAML:** lightingpremise.yaml
-
----
-
-## Front Porch Manual Override
-
-### What It Does
-
-When `light.front_porch_override` is manually turned on, automatically turns it off after 3 hours. Timer restarts if turned on again while running.
-
-### Hardware
-
-**Insteon Switch:**
-- Entity: `light.front_porch_override`
-- Controlled via Insteon Scene 29
-
-### Automations
-
-**Front Porch Manual Override:**
-- `premise_front_porch_manual_override`
-- Trigger: `light.front_porch_override` turns on
-- Action: Wait 3 hours, deactivate Scene 29 (double-send)
-- Mode: `restart` — timer resets on repeated activation
+Ring may send duplicate events at the same timestamp. The 2-second delay at action start lets `mode: restart` absorb the duplicate before the notification fires, preventing double-alerts from a single physical motion trigger.
 
 **YAML:** lightingpremise.yaml
 
@@ -248,7 +226,7 @@ Sends biannual reminders (February 1 and August 1) to unplug and replug the phot
 **Pushover House Alerts** (`notify.house_alerts`):
 - Photocell failure detected (backup automation activated)
 - Photocell maintenance reminders (February 1, August 1)
-- Front motion at night (when motion triggers lights after scheduled shutoff)
+- Front motion at night (every motion event that triggers lights after scheduled shutoff)
 - Priority: High (attention required)
 
 ---
@@ -257,6 +235,7 @@ Sends biannual reminders (February 1 and August 1) to unplug and replug the phot
 
 **Sun Integration:**
 - Provides backup failsafe timing (sunset/sunrise)
+- Dusk On upper time bound tracks sunset dynamically
 - See: sun-integration.md
 
 **Ring Integration:**
@@ -274,7 +253,7 @@ Sends biannual reminders (February 1 and August 1) to unplug and replug the phot
 ## Troubleshooting
 
 **Lights not turning on at dusk:**
-- Check photocell sensor state (`switch.photocell_micro_module`)
+- Check photocell sensor state (`switch.photocell_micro_module`) — off = dark, on = light
 - Verify seasonal delay isn't too long for current conditions
 - Check if backup automation ran (indicates photocell failure)
 - Inspect physical photocell sensor at bedroom window
@@ -292,13 +271,12 @@ Sends biannual reminders (February 1 and August 1) to unplug and replug the phot
 **Motion override not working:**
 - Verify Ring doorbell motion sensor is online
 - Check if `event.front_door_motion` is firing (Developer Tools → Events)
-- Verify photocell is "on" (must be dark for override to trigger)
-- Check if premise lights are already on (override only works after scheduled shutoff)
-- Motion detection must occur after nighttime shutoff to trigger
+- Verify `input_boolean.front_motion_armed` is on (set at dusk, cleared at dawn)
+- Check if `light.entry_closet_premise` is off (override only works when premise lights are off)
 - Not during 1:00 PM photocell reset window (12:58 PM - 1:01 PM)
 
 **Motion override triggering during the day:**
-- Automation blocked by photocell condition (must be "on" = dark)
+- Blocked by `input_boolean.front_motion_armed` (only true between dusk-on and dawn-off)
 - Also blocked during 1:00 PM reset window
 - Should not trigger during daylight hours
 

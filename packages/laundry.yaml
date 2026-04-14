@@ -9,15 +9,18 @@
 # efficiently manage fan runtime.
 #
 # AUTOMATIONS:
-# 1. laundry_dryer_fan_control (Main)
+# 1. laundry_dryer_fan_control (Main) — mode: restart
 #    - Detects dryer ON (>200W) - Sets temperature baseline & turns fan ON
 #    - Detects dryer OFF (<2W) - Runs temp-based cooldown with 45-min timeout
 #    - Cooldown stops when temp drops to baseline+3F OR 45 minutes elapsed
 #    - Triggers HVAC exhaust boost script when fan turns off
+#    - NOTE: mode:restart means a new dryer_off trigger during cooldown cancels
+#      and restarts cooldown with a fresh 45-minute deadline
 #
-# 2. laundry_baseline_timeout (Maintenance)
+# 2. laundry_baseline_timeout (Maintenance) — mode: single
 #    - Resets temperature baseline to 0 after 4 hours of dryer inactivity
 #    - Runs every 30 minutes to check for stale baseline data
+#    - Only resets if baseline > 0 (guard against redundant resets)
 #
 # REQUIRED ENTITIES (not in this package):
 # - sensor.dryer_monitor_current_power (power monitoring sensor)
@@ -131,8 +134,11 @@ automation:
                             {{ current <= (baseline + 3) }}
 
                         # Condition B: 45-minute timeout
+                        # float without a default is intentional — if cooldown_deadline
+                        # fails to resolve, the template errors visibly rather than
+                        # silently defaulting to 0 and immediately exiting the loop.
                         - condition: template
-                          value_template: "{{ as_timestamp(now()) >= cooldown_deadline | float(0) }}"
+                          value_template: "{{ as_timestamp(now()) >= cooldown_deadline | float }}"
 
                   sequence:
                     - delay: "00:02:00"

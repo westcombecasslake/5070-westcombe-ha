@@ -1,6 +1,6 @@
 # Laundry Automation
 
-**Last Updated:** February 2026
+**Last Updated:** April 2026
 
 ---
 
@@ -57,6 +57,7 @@ Automatically detects dryer operation through power monitoring, sets a temperatu
 
 **Dryer Fan Control (Main Logic):**
 - `laundry_dryer_fan_control`
+- **Mode: `restart`** — if a new dryer_off trigger fires while cooldown is running (e.g. power fluctuation crossing the 2W threshold), the current cooldown is cancelled and restarts with a fresh 45-minute deadline. A dryer_on trigger during cooldown similarly cancels and re-evaluates baseline.
 - Trigger: Power state change (numeric_state on sensor.dryer_monitor_current_power)
 - Detection Logic:
   - Dryer ON (>200W): Set temperature baseline (if needed), turn fan ON
@@ -72,8 +73,10 @@ Automatically detects dryer operation through power monitoring, sets a temperatu
 
 **Baseline Timeout Reset:**
 - `laundry_baseline_timeout`
+- **Mode: `single`** — if a reset is already in progress when the 30-minute trigger fires again, the duplicate run is discarded.
 - Trigger: Every 30 minutes
-- Condition: Dryer has been off for 4+ hours
+- Condition: `baseline > 0` AND dryer has been off for 4+ hours
+  - The `baseline > 0` guard prevents redundant resets when the baseline is already cleared, and avoids the reset firing on HA startup before any dryer cycle has run.
 - Action: Resets baseline to 0
 - Rationale: Clears stale baseline data when dryer hasn't been used
 
