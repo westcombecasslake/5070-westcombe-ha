@@ -28,15 +28,15 @@ Google Account: westcombecasslake@gmail.com (transfers with house)
 
 **Combo Units (Smoke + CO):**
 - Basement - YS7A01-UC (SN:FBC38CFBE9)
-- Living Area - YS7A01-UC (SN:87806D927D)
+- Dining Room - YS7A01-UC (SN:87806D927D)
 - Master Bedroom - YS7A01-UC (SN:F88A4B3835)
 
 **Smoke Only:**
-- Dan's Bedroom - YS7A02-UC (SN:CD87276F48)
+- South Bedroom - YS7A02-UC (SN:CD87276F48)
 - Den - YS7A02-UC (SN:F076C89F79)
 - Garage - YS7A02-UC (SN:A03FCE857A)
 - Office - YS7A02-UC (SN:F462D4B547)
-- Sarah's Bedroom - YS7A02-UC (SN:E958B19405)
+- East Suite - YS7A02-UC (SN:E958B19405)
 
 **Additional:**
 - **YoLink Siren** (YS7103-UC, SN:281B4FEB47) in middle bathroom - whole house alert
@@ -45,7 +45,7 @@ Google Account: westcombecasslake@gmail.com (transfers with house)
 
 **3 Smoke/CO Combo Units:**
 - Basement (furnace/utilities area)
-- Living Area (central location)
+- Dining Room (central location)
 - Master Bedroom (sleeping area)
 
 **5 Smoke-Only Units:**
@@ -57,17 +57,26 @@ Google Account: westcombecasslake@gmail.com (transfers with house)
 
 ### Monitoring Features
 
-#### Real-Time Detection
-```yaml
-Trigger: binary_sensor.*_smoke → "on"
-Alert: House Alerts (HIGH PRIORITY)
-Action: Immediate notification with location
-```
+#### Real-Time Detection (Emergency Response)
 
 ```yaml
-Trigger: binary_sensor.*_carbon_monoxide → "on"
-Alert: House Alerts (HIGH PRIORITY)  
-Action: EVACUATE message with location
+Trigger: Any smoke or CO sensor → "on"
+Alert: House Alerts (HIGH PRIORITY)
+Actions:
+  - Shut down HVAC fan (set to auto mode - stops circulating smoke/CO through ducts)
+  - Turn off all 4 bath exhaust fans (master, entry, middle, east suite)
+  - Single consolidated notification with location and type
+```
+
+#### All Clear Recovery
+
+```yaml
+Trigger: All smoke and CO sensors clear for 2 minutes
+Alert: House Notices (NORMAL PRIORITY)
+Actions:
+  - Turn off bath fans (humidity automations resume normal control)
+  - HVAC resumes normal operation (Ecobee controls)
+  - Confirmation notification sent
 ```
 
 #### Offline Detection
@@ -78,6 +87,28 @@ Action: Notification to check detector and battery
 ```
 
 **Recovery:** Automatic status update when sensor returns online after 2 minutes.
+
+**Suppression conditions (offline notification will not fire if):**
+- YoLink cloud is offline (`input_text.yolink_status` != Online) — system health covers the outage
+- This detector was already notified and has not yet recovered (flap protection)
+
+**Per-detector cooldown flags:**
+
+Eight `input_boolean` helpers (one per detector) prevent repeat offline notifications during sensor flapping:
+- Set ON when an offline notification fires for that detector
+- Cleared automatically when the detector comes back online
+- A new offline notification will only fire again after a full online recovery
+
+```
+input_boolean.smoke_co_notified_basement
+input_boolean.smoke_co_notified_south_bedroom
+input_boolean.smoke_co_notified_den
+input_boolean.smoke_co_notified_dining_room
+input_boolean.smoke_co_notified_garage
+input_boolean.smoke_co_notified_master_bedroom
+input_boolean.smoke_co_notified_office
+input_boolean.smoke_co_notified_east_bedroom
+```
 
 #### Status Tracking
 
@@ -101,21 +132,31 @@ Two helper entities provide system-wide status:
 
 **Smoke Detection:**
 ```
-Title: Basement Smoke CO
-Message: SMOKE DETECTED
+Title: 🔥 SMOKE DETECTED
+Message: Location: Basement Smoke CO
+         HVAC fan and all bath fans shut down
          Check location immediately
 ```
 
 **CO Detection:**
 ```
-Title: Living Area Smoke CO  
-Message: CARBON MONOXIDE DETECTED
-         EVACUATE and check immediately
+Title: ☠️ CARBON MONOXIDE DETECTED
+Message: Location: Dining Room Smoke CO
+         HVAC fan and all bath fans shut down
+         EVACUATE immediately
+```
+
+**All Clear:**
+```
+Title: ✅ Smoke/CO All Clear
+Message: All detectors cleared
+         HVAC and bath fans restored to normal operation
+         Verify area is safe before re-entry
 ```
 
 **Offline Notification:**
 ```
-Title: Garage Smoke Sensor
+Title: Garage Smoke Alarm
 Message: Status: Offline (10+ min)
          Check detector and battery
 ```
@@ -463,9 +504,12 @@ Battery status entities can be added to dashboards for at-a-glance monitoring:
 - Restart events
 - Integration status
 
-**Hub Status:**
-- YoLink Hub connectivity
-- Ecobee API status
+**Integration Status (5 monitored):**
+- Insteon (proxy: `light.entry_bath_fan`, `light.master_bath_fan`)
+- YoLink (proxy: smoke/CO and humidity sensor battery entities)
+- Ecobee (proxy: `sensor.main_floor_current_temperature`)
+- Ring (proxy: `sensor.front_door_battery`)
+- Matter/Thread (proxy: `sensor.master_bedroom_outlet_thread_router_power_top`)
 
 ### Startup Monitoring
 
@@ -480,16 +524,16 @@ Startup handling is managed by `systemstartup.yaml`. On every restart:
 
 **Integration Failures:**
 ```yaml
-Trigger: Integration becomes unavailable
-Alert: House Notices (NORMAL PRIORITY)
-Action: Notify which integration failed
+Trigger: Integration becomes unavailable for 10+ minutes (15 min for Ring)
+Alert: House Alerts (HIGH PRIORITY)
+Action: Notify which integration failed with remediation guidance
 ```
 
-**Unusual Restarts:**
+**HA Restarts:**
 ```yaml
-Trigger: HA restart without user initiation
-Alert: House Notices (NORMAL PRIORITY)
-Action: Log restart reason if available
+Trigger: Every HA restart (no distinction between user-initiated and unexpected)
+Alert: House Alerts (HIGH PRIORITY)
+Action: Restart notification with timestamp; status helpers refreshed
 ```
 
 

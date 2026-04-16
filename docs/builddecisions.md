@@ -100,8 +100,7 @@
 | `notify.house_alerts` | High (1) | Safety, immediate action required |
 | `notify.house_notices` | Normal (0) | Awareness, act within 24–48 hrs |
 | `notify.operational_log` | Silent (-2) | Routine confirmations, daily summaries |
-| `notify.battery_alerts` | Normal (0) | 30% low battery warnings |
-| `notify.house_alerts` | High (1) | Safety emergencies AND 15% critical battery alerts |
+| `notify.battery_alerts` | Normal (0) | 25% low battery warnings |
 
 **Why:** Mixed priorities train the homeowner to ignore critical alerts. Battery warnings (30%) are isolated in `battery_alerts` so they don't pollute the alert stream. Critical battery alerts (15%) route to `house_alerts` because a dying smoke detector or leak sensor battery is a safety gap — it deserves the same urgency as an actual event.
 
@@ -161,11 +160,11 @@
 
 ---
 
-## 12. YoLink Battery — Two-Level Alert System
+## 12. YoLink Battery — Single-Level Alert System
 
-**Decision:** Battery alerts fire at ~30% (order soon) and ~15% (replace immediately), with split routing: 30% warning → `notify.battery_alerts` (Normal priority); 15% critical → `notify.house_alerts` (High priority).
+**Decision:** Battery alerts fire at 25%, routed to `notify.battery_alerts` (Normal priority).
 
-**Why:** 30% gives weeks of lead time to order without urgency — review at your convenience. 15% is critical-replace-now, and a dying battery in a smoke detector or leak sensor is a safety gap. Routing it to `house_alerts` ensures the same urgency as an actual smoke or flood event. Single threshold at low% gives no planning window.
+**Why:** A single threshold at 25% provides enough lead time to order replacements without urgency. All battery alerts route to `battery_alerts` to keep the alert stream clean and prevent battery warnings from polluting `house_alerts`.
 
 ---
 

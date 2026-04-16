@@ -169,7 +169,7 @@ The YoLink mobile app is used for:
 5. **Configure notification settings** per your preferences
 
 **Notification Tiers:**
-- **Battery Alerts:** Low battery warnings (30% and 15% thresholds)
+- **Battery Alerts:** Low battery warnings (25% threshold)
 - **House Alerts (Priority 1):** Critical - loud tone, no quiet hours
 - **House Notices (Priority 0):** Awareness - normal tone, quiet hours optional
 - **Operational Log (Priority -2):** Silent - review when convenient
@@ -802,7 +802,7 @@ If you choose to self-manage:
 - Review operational log for any anomalies
 
 **As Alerted:**
-- **Battery Warnings:** Order/replace batteries promptly (30% = weeks, 15% = days)
+- **Battery Warnings:** Order/replace batteries promptly (25% threshold)
 - **Humidifier Pad:** Replace when alerted (typically annually)
 - **Photocell Sensor:** Unplug/replug when reminded (Feb 1 & Aug 1)
 - **Any House Alerts:** Investigate immediately (or call contractor)

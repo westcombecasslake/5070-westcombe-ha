@@ -125,7 +125,7 @@ Due to hub login authentication, the YoLink hub can be placed on a separate LAN 
 - **Special Battery Note:** 10-year non-replaceable sensor head with 2 replaceable batteries in YoLink LoRa base (batteries last several years)
 
 **Smoke-Only Units (YS7A02-UC):**
-- Locations: South Bedroom, Den, Garage, Office, East Bedroom
+- Locations: South Bedroom, Den, Garage, Office, East Suite
 - Photoelectric smoke detection
 - Battery powered
 - Integrated with whole-house siren

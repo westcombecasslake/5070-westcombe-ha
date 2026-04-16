@@ -86,7 +86,7 @@ input_boolean:
     name: "Smoke/CO Notified - Office"
 
   smoke_co_notified_east_bedroom:
-    name: "Smoke/CO Notified - East Bedroom"
+    name: "Smoke/CO Notified - East Suite"
 
 # --------------------------------------------------
 # Smoke/CO Monitoring Automations
@@ -440,7 +440,7 @@ automation:
           ('Garage',         'binary_sensor.garage_smoke_alarm_carbon_monoxide'),
           ('Master Bedroom', 'binary_sensor.master_bedroom_smoke_co_alarm_carbon_monoxide'),
           ('Office',         'binary_sensor.office_smoke_alarm_carbon_monoxide'),
-          ('East Bedroom',   'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide')
+          ('East Suite',     'binary_sensor.east_bedroom_smoke_alarm_carbon_monoxide')
         ] %}
         {% set ns = namespace(lines=[]) %}
         {% for name, entity in devices %}

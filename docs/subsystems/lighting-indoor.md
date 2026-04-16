@@ -16,9 +16,9 @@ All indoor lighting operates through Insteon scenes, ensuring lights can be cont
 
 ### What It Does
 
-Automatically fades up living room lamps 40 minutes before sunset for ambient evening lighting (Scene 31 gradual fade), then turns them off at night (11:20 PM + random delay) via Scene 24 instant toggle after confirming the room is unoccupied via Ecobee sensor. Additionally, lamps are automatically faded off in the morning (35 minutes after daylight is detected by the photocell sensor) to catch any lamps that were manually turned on and left on overnight.
+Automatically fades up living room lamps 40 minutes before sunset for ambient evening lighting (Scene 31 gradual fade), then turns them off at night (11:20 PM + random delay) via Scene 24 instant toggle after confirming the room is unoccupied via Ecobee sensor. Additionally, lamps are automatically faded off in the morning (35 minutes after the photocell turns on at dawn) to catch any lamps that were manually turned on and left on overnight.
 
-When the Ecobee thermostat is in "away" mode, lamps also activate in the early morning at randomized times (weekdays 5:27-6:48 AM, weekends 7:13-7:58 AM) to simulate occupancy for security purposes.
+When `input_boolean.long_term_away` is on (set automatically after 24 hours of no main floor occupancy), lamps also activate in the early morning at randomized times (weekdays 5:27-6:48 AM, weekends 7:13-7:58 AM) to simulate occupancy for security purposes.
 
 **Rationale:** Sunset-based activation ensures lights come on at the right time year-round without manual schedules. Occupancy check prevents lights from turning off while someone is present. Random delay creates natural variation rather than predictable timing. 2-hour timeout prevents indefinite waiting if occupancy sensor fails. Morning fade-off prevents lamps from staying on all day if manually activated and forgotten overnight. Away mode simulation provides security by making the house appear occupied during absences.
 
@@ -46,9 +46,11 @@ When the Ecobee thermostat is in "away" mode, lamps also activate in the early m
 
 **Sensors:**
 - `binary_sensor.main_floor_occupancy` - Ecobee occupancy sensor
-- `select.main_floor_current_mode` - Ecobee thermostat mode (away detection)
 - `sun.sun` - Sun integration for sunset timing
 - `switch.photocell_micro_module` - Indoor photocell for dawn/dusk detection
+
+**Helpers:**
+- `input_boolean.long_term_away` - Set after 24h no main floor occupancy (declared in garage.yaml)
 
 **User Controls:**
 - None (fully automatic, but manual Insteon switch control always available)
@@ -57,9 +59,10 @@ When the Ecobee thermostat is in "away" mode, lamps also activate in the early m
 
 **Living Room Lamps Fade Up:**
 - `living_room_lamps_fade_up`
-- Trigger: 40 minutes before sunset
+- Trigger: 50 minutes before sunset OR photocell turns off (dusk detected)
+- Condition: After 2:00 PM (guards against 1 PM daily photocell reset triggering a false fade-up)
 - Action: Activate Insteon Scene 31 (lamps ON)
-- Rationale: Gradual ambient lighting before darkness
+- Rationale: Gradual ambient lighting before darkness; dual trigger ensures activation even if sun timing and actual darkness diverge
 
 **Living Room Lamps Off (Night):**
 - `living_room_lamps_off_1120_random`
@@ -71,21 +74,22 @@ When the Ecobee thermostat is in "away" mode, lamps also activate in the early m
 
 **Living Room Lamps Morning Fade Off:**
 - `living_room_lamps_morning_fade_off`
-- Trigger: 35 minutes after dusk sensor turns off (daylight detected)
+- Trigger: Photocell turns on (daylight detected), after 35-minute delay
+- Condition: Between 5:00 AM and 10:00 AM (prevents false triggers outside dawn window)
 - Action: Deactivate Scene 31 (gradual 2.5 minute fade-down)
 - Rationale: Catches lamps manually turned on overnight, gradually fading them off as natural daylight increases
 
 **Living Room Lamps Away Mode (Weekday):**
 - `living_room_lamps_away_weekday`
 - Trigger: Random time 5:27-6:48 AM Monday-Friday
-- Condition: Ecobee thermostat in "away" mode
+- Condition: `input_boolean.long_term_away` is on (24h no main floor occupancy)
 - Action: Activate Scene 24 (instant ON)
 - Rationale: Simulates occupancy for security when house is unoccupied on weekdays
 
 **Living Room Lamps Away Mode (Weekend):**
 - `living_room_lamps_away_weekend`
 - Trigger: Random time 7:13-7:58 AM Saturday-Sunday
-- Condition: Ecobee thermostat in "away" mode
+- Condition: `input_boolean.long_term_away` is on (24h no main floor occupancy)
 - Action: Activate Scene 24 (instant ON)
 - Rationale: Simulates occupancy for security when house is unoccupied on weekends, reflects typical later weekend wake time
 
@@ -157,7 +161,7 @@ Provides dashboard toggle control for seasonal decorative lighting (typically ho
 
 Automatically turns off master bedroom lights when the room becomes unoccupied, as detected by the Ecobee remote sensor. Light activation is handled manually or via motion detection (external to this package).
 
-When the Ecobee thermostat is in "away" mode, the bedroom lights also activate in the evening (random time 9:22-9:34 PM) and remain on for 17-26 minutes to simulate bedroom activity for security purposes.
+When `input_boolean.long_term_away` is on (set automatically after 24 hours of no main floor occupancy), the bedroom lights also activate in the evening (random time 9:22-9:34 PM) and remain on for 17-26 minutes to simulate bedroom activity for security purposes.
 
 **Rationale:** Prevents lights from being left on when room is empty, saving energy. Only controls OFF behavior since ON is typically intentional (manual switch or separate motion automation). Away mode simulation creates realistic evening activity patterns to deter potential intruders.
 
@@ -180,7 +184,9 @@ When the Ecobee thermostat is in "away" mode, the bedroom lights also activate i
 
 **Sensors:**
 - `binary_sensor.master_bedroom_occupancy` - Ecobee remote sensor
-- `select.main_floor_current_mode` - Ecobee thermostat mode (away detection)
+
+**Helpers:**
+- `input_boolean.long_term_away` - Set after 24h no main floor occupancy (declared in garage.yaml)
 
 **User Controls:**
 - None (fully automatic)
@@ -196,7 +202,7 @@ When the Ecobee thermostat is in "away" mode, the bedroom lights also activate i
 **Master Bedroom Away Mode Evening:**
 - `master_bedroom_away_evening`
 - Trigger: Random time 9:22-9:34 PM daily
-- Condition: Ecobee thermostat in "away" mode
+- Condition: `input_boolean.long_term_away` is on (24h no main floor occupancy)
 - Action: Activate Scene 30, wait 17-26 minutes, deactivate Scene 30
 - Rationale: Simulates evening bedroom activity for security when house is unoccupied
 
@@ -259,8 +265,8 @@ No notifications configured for indoor lighting automations.
 
 **Living room lamps not turning off in morning:**
 - Verify photocell sensor is functioning (`switch.photocell_micro_module`)
-- Check if sensor transitions to "off" state at dawn
-- Automation waits 35 minutes after sensor turns off
+- Check if sensor transitions to "on" state at dawn
+- Automation waits 35 minutes after photocell turns on, between 5:00-10:00 AM
 - Scene 31 can always be manually deactivated
 
 **Seasonal lights not responding to toggle:**
@@ -274,7 +280,7 @@ No notifications configured for indoor lighting automations.
 - Manual off via Scene 23 always available
 
 **Living room lamps not activating in away mode:**
-- Verify Ecobee mode shows "away" (`select.main_floor_current_mode`)
+- Verify `input_boolean.long_term_away` is on (requires 24h of no main floor occupancy)
 - Check automation triggered at correct day/time (M-F 5:27 AM or S-S 7:13 AM)
 - Random delay means activation could be up to 81 minutes later (weekday) or 45 minutes later (weekend)
 - Review automation traces for `living_room_lamps_away_weekday` or `living_room_lamps_away_weekend`
@@ -286,7 +292,7 @@ No notifications configured for indoor lighting automations.
 - Ensure Scene 30 responds to manual control
 
 **Master bedroom not activating in away mode (evening):**
-- Verify Ecobee mode shows "away" (`select.main_floor_current_mode`)
+- Verify `input_boolean.long_term_away` is on (requires 24h of no main floor occupancy)
 - Check automation triggered at 9:22 PM
 - Random delay means activation could be 0-12 minutes later (9:22-9:34 PM)
 - Lights stay on for 17-26 minutes, then auto-off

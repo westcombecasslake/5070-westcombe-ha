@@ -48,10 +48,10 @@ Four-tier Pushover system -- never mix tiers:
 
 | Service | Priority | Use For |
 |---|---|---|
-| `notify.house_alerts` | High (1) | Safety emergencies + 15% critical battery |
+| `notify.house_alerts` | High (1) | Safety emergencies |
 | `notify.house_notices` | Normal (0) | Awareness, act within 24-48 hrs |
 | `notify.operational_log` | Silent (-2) | Daily summaries, routine confirmations |
-| `notify.battery_alerts` | Normal (0) | 30% low battery warnings |
+| `notify.battery_alerts` | Normal (0) | 25% low battery warnings |
 
 ---
 
@@ -70,9 +70,10 @@ Four-tier Pushover system -- never mix tiers:
 | Air Quality | `airquality.yaml` | CO2, PM2.5, TVOC via IKEA Alpstuga sensors |
 | Fridge/Freezer | `fridgefreezer.yaml` | Temperature monitoring, failure detection |
 | Laundry | `laundry.yaml` | Dryer cycle completion, HVAC fan boost |
+| Washer/Dryer Notify | `washerdryernotify.yaml` | Washer and dryer cycle completion notifications |
 | Garage | `garage.yaml` | Motion lighting, freeze alerts |
 | Irrigation | `irrigation.yaml` | Seasonal schedule automation |
-| Battery Monitoring | `batteryalerts.yaml` | 24 devices, 30%/15% two-tier alerting |
+| Battery Monitoring | `batteryalerts.yaml` | Single-level battery alerts (25% threshold) |
 | System Health | `systemhealth.yaml` | Integration status, daily health reports |
 | System Startup | `systemstartup.yaml` | Post-restart status restoration |
 | Power Infrastructure | `powerinfrastructure.yaml` | Preventive power cycling for devices requiring periodic resets |

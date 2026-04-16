@@ -90,7 +90,7 @@ Based on ASHRAE and WHO guidelines:
 
 ### PM2.5 Filtration (Highest Priority)
 
-**Activation (35 μg/m³ threshold):**
+**Activation (35 μg/m³ sustained for 3 minutes):**
 1. Sets `input_boolean.pm25_filtration_active` to ON
 2. Records start time for duration tracking
 3. Turns HVAC fan to ON mode (runs continuously)
@@ -144,20 +144,19 @@ Based on ASHRAE and WHO guidelines:
 
 ## Notifications
 
-### House Alerts (Priority 1-2)
+### House Alerts (Priority 1)
 
-**Emergency - Priority 2:**
-- PM2.5 >150 μg/m³ (Very Unhealthy)
+**PM2.5 Very Unhealthy (150+ μg/m³):**
 - Title: "⚠️ AIR QUALITY EMERGENCY"
-- Sound: Siren
-- Action required: Close windows, stay indoors
+- Action required: Close windows, stay indoors, check air quality source
 
-**High Priority - Priority 1:**
-- PM2.5 55-150 μg/m³ (Unhealthy)
-- CO2 >2000 ppm (Critical)
-- Title: "⚠️ AIR QUALITY ALERT" or "⚠️ CO2 CRITICAL"
-- Sound: Loud alert
-- Action required: Immediate ventilation
+**PM2.5 Unhealthy (55-150 μg/m³):**
+- Title: "⚠️ AIR QUALITY ALERT"
+- Action required: Avoid outdoor air intake, HVAC filter running
+
+**CO2 Critical (>2000 ppm):**
+- Title: "⚠️ CO2 CRITICAL"
+- Action required: Open windows immediately
 
 ### House Notices (Priority 0)
 
@@ -249,6 +248,7 @@ Trend: -2 events vs 7-day avg (better)
 
 **Status Indicators:**
 - `input_boolean.pm25_filtration_active` - PM2.5 filtration running
+- `input_text.pm25_status` - Current PM2.5 status ("Normal" or "Active - X μg/m³")
 
 **Daily Statistics:**
 - `input_number.living_area_co2_max_today` - Daily max CO2 (Floor 1)

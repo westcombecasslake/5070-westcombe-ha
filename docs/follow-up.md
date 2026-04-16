@@ -7,6 +7,16 @@ subsystem reviews. These are not bugs -- implement or investigate when ready.
 
 ## Sump Pump
 
+**Verify depth sensor polarity**
+- Hardware wiring indicates `on` should be normal depth, `off` should be HIGH WATER ALERT
+- Doc and YAML header comment say `on = Normal, off = HIGH` (consistent with wiring)
+- But YAML automation code does the opposite: `if off → "Normal", else → "HIGH!"`
+- Live sensor shows `off` during normal conditions -- contradicts wiring expectation
+- Needs physical verification: manually trigger the float, observe entity state, confirm which value is correct
+- If code is wrong: fix the `if` condition in all 4 sump pump notification templates in `sumppump.yaml`
+- If doc/comment is wrong: update doc and YAML header comment
+- File: `/homeassistant/packages/sumppump.yaml`, `/homeassistant/docs/subsystems/safety-monitoring.md`
+
 **Verify rainfall sensor attribute**
 - `sensor.rainfall_24_hours` reads `state_attr('weather.forecast_home_2', 'precipitation')`
 - Depending on Met.no, this may be current precipitation rate rather than 24h accumulation

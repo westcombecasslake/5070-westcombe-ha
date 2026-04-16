@@ -170,7 +170,7 @@ Provides manual 30-minute irrigation run button for spot watering needs and enfo
 
 **Irrigation not running on schedule:**
 - Verify `input_boolean.irrigation_system_enabled` is ON
-- Check recent weather - rain or high precipitation probability skips run
+- Check recent weather state — skip only triggers on active precipitation states (rainy/pouring/lightning-rainy/snowy-rainy); precipitation probability threshold is not used in skip logic
 - Review `input_number.irrigation_zone_runtime` - should be 25 or 45 min
 - Check `weather.forecast_home_2` is updating correctly
 

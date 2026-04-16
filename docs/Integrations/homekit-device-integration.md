@@ -57,7 +57,7 @@ Standard integration location - single location like YoLink and Pushover.
 - Serial Number: 522679989982
 - Connection: WiFi to home network
 - Controls: Main floor HVAC system
-- Location: Main floor hallway
+- Location: Main floor dining room
 
 **Ecobee Remote Sensor:**
 - Type: Room sensor with occupancy detection
@@ -157,10 +157,10 @@ Standard integration location - single location like YoLink and Pushover.
   - HVAC action (heating/cooling/idle)
 
 **Sensor Entities:**
-- `sensor.ecobee_temperature` - Current temperature
-- `sensor.ecobee_humidity` - Current humidity
-- `sensor.ecobee_occupancy` - Occupancy status
-- Remote sensor temperature and occupancy entities (Master bedroom)
+- `sensor.main_floor_current_temperature` - Current temperature
+- `sensor.main_floor_current_humidity` - Current humidity
+- `binary_sensor.main_floor_occupancy` - Main floor occupancy (Ecobee built-in sensor)
+- `binary_sensor.master_bedroom_occupancy` - Master bedroom occupancy (remote sensor)
 
 **Fan Control:**
 - HVAC fan controllable via script through HomeKit integration
@@ -201,10 +201,10 @@ Home Assistant controls the Ecobee HVAC fan through scripts that interact with t
 
 **Use Cases:**
 1. **Master Bathroom Ventilation:**
-   - Humidity sensor detects high humidity (shower/bath)
-   - HA script turns HVAC fan ON
-   - Fan runs until humidity drops to normal
-   - HA script turns HVAC fan back to AUTO
+   - Humidity sensor detects shower (rapid humidity rise)
+   - Exhaust fan runs for flat 20 minutes
+   - HVAC fan boost runs after exhaust fan cycle completes
+   - HVAC fan returns to AUTO when boost finishes
 
 2. **Laundry Room Ventilation:**
    - Dryer power consumption detected (cycle running)

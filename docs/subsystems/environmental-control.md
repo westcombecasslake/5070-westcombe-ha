@@ -57,13 +57,13 @@ Tracks the performance of the whole-house humidifier pad over time by monitoring
 **Below Baseline Warning:**
 - `humidifier_pad_below_baseline_warning`
 - Trigger: 7-day average falls 8%+ below baseline for 72+ hours
-- Action: NORMAL priority
+- Action: HIGH priority alert
 - Message: "Humidity below baseline - humidifier pad may be degrading"
 
 **Declining Trend Notice:**
 - `humidifier_pad_declining_trend_notice`
 - Trigger: Negative 7-day trend sustained 5+ days AND 7-day average below 40%
-- Action: LOW priority early warning via house_notices
+- Action: NORMAL priority early warning via house_notices
 
 **Pad Change Detection:**
 - `humidifier_pad_change_detected`
@@ -211,7 +211,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 
 **YAML:** middlebathhumidity.yaml
 
-#### East Bath
+#### East Suite
 
 **Hardware:**
 - YoLink Humidity Sensor: `sensor.east_suite_bathroom_humidity`
@@ -332,7 +332,7 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 
 **Matter/Thread Switches:**
 - Middle bath fan: `fan.middle_bath_humidity`
-- East bath fan: `fan.east_suite_bathroom_humidity`
+- East Suite fan: `fan.east_suite_bathroom_humidity`
 - See: matter-thread-integration.md
 
 ---

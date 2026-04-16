@@ -12,7 +12,7 @@ The Garage Systems subsystem provides three independent functions:
 - **Freezing temperature monitoring** to protect against pipe freeze damage
 - **Away mode sensor monitoring** with Pushover alerts when vacation mode is active
 
-Lighting and temperature alerts operate continuously. Away monitoring is user-controlled via the `vacation_mode` helper and only activates when enabled.
+Lighting and temperature alerts operate continuously. Away monitoring activates automatically after 8 hours of no main floor occupancy and resets when occupancy returns.
 
 ---
 
@@ -113,7 +113,7 @@ Monitors garage temperature and sends repeating alerts if temperature remains at
 
 ### What It Does
 
-When vacation mode is active, monitors all three garage sensors (motion and both doors) and sends Pushover alerts via House Alerts. Designed to inform without spamming — the first trigger sends an immediate alert, and subsequent activity is counted and summarized every 30 minutes. The monitoring session automatically resets if no new activity occurs for 1.5 hours, and fully resets when vacation mode is turned off.
+When the house has been unoccupied for 8+ hours (`input_boolean.house_unoccupied`), monitors all three garage sensors (motion and both doors) and sends Pushover alerts via House Alerts. Designed to inform without spamming — the first trigger sends an immediate alert, and subsequent activity is counted and summarized every 30 minutes. The monitoring session automatically resets if no new activity occurs for 1.5 hours, and fully resets when vacation mode is turned off.
 
 **Rationale:** The garage is locked and closed when away. Any sensor activity warrants awareness but repeated alerts for sustained activity (wind, sensor drift, wildlife) would be disruptive. The summary approach balances awareness with noise control.
 
@@ -129,7 +129,8 @@ When vacation mode is active, monitors all three garage sensors (motion and both
 
 | Helper | Entity | Purpose |
 |--------|--------|---------|
-| Vacation Mode | `input_boolean.vacation_mode` | User-controlled master switch for all away mode features. Shared with lighting_indoor.yaml |
+| House Unoccupied | `input_boolean.house_unoccupied` | Set automatically after 8h no main floor occupancy; triggers garage away monitoring |
+| Long Term Away | `input_boolean.long_term_away` | Set automatically after 24h no main floor occupancy; used by lighting simulations in lighting-indoor.yaml |
 | Garage Away Alert Active | `input_boolean.garage_away_alert_active` | Tracks whether a monitoring session is currently armed |
 | Garage Away Trigger Count | `input_number.garage_away_trigger_count` | Counts additional sensor triggers after first alert |
 | Garage Away Last Trigger | `input_datetime.garage_away_last_trigger` | Timestamps last trigger for 1.5-hour inactivity check |
@@ -147,7 +148,7 @@ When vacation mode is active, monitors all three garage sensors (motion and both
 - ID: `garage_away_sensor_trigger`
 - Alias: `Garage - Away Mode Sensor Trigger`
 - Trigger: Any of the 3 sensors goes on
-- Condition: `input_boolean.vacation_mode` is on
+- Condition: `input_boolean.house_unoccupied` is on
 - Mode: Queued
 - Action: Stamps last trigger time; if first trigger arms the session and sends alert; if already armed increments the counter
 
@@ -159,9 +160,9 @@ When vacation mode is active, monitors all three garage sensors (motion and both
 - Action: Loops every 30 minutes; exits and resets if no activity for 1.5 hours; sends summary if counter > 0; stays quiet if counter = 0
 
 **Garage Away Mode Reset:**
-- ID: `garage_away_reset_on_exit`
-- Alias: `Garage - Reset Away Alert on Vacation Mode Off`
-- Trigger: `vacation_mode` turns off
+- ID: `garage_away_reset_on_return`
+- Alias: `Garage - Reset Away Alert on Occupancy Return`
+- Trigger: `house_unoccupied` turns off (occupancy returns)
 - Action: Turns off alert active boolean, resets trigger counter
 
 **YAML:** garage.yaml
@@ -170,9 +171,7 @@ When vacation mode is active, monitors all three garage sensors (motion and both
 
 ## User Controls
 
-| Control | Entity | Access | Purpose |
-|---------|--------|--------|---------|
-| Vacation Mode | `input_boolean.vacation_mode` | Android home screen widget | Enables/disables all away mode monitoring and lighting simulation across the house |
+Away monitoring is fully automatic — no user controls required. Garage away monitoring activates when `house_unoccupied` goes on (8h no motion) and resets when occupancy returns.
 
 **Manual Overrides:**
 - Scene 20 can be manually activated/deactivated via Insteon controls
@@ -204,14 +203,14 @@ When vacation mode is active, monitors all three garage sensors (motion and both
 - Scene 20: Garage lighting
 - See: insteon-scenes.md
 
-**Vacation Mode:**
-- `input_boolean.vacation_mode` is declared in garage.yaml and shared with lighting_indoor.yaml
-- Away mode lighting simulation (living room, master bedroom) also uses this helper
+**Occupancy Helpers:**
+- `input_boolean.house_unoccupied` and `input_boolean.long_term_away` are both declared in garage.yaml
+- `long_term_away` is used by lighting simulations in lighting-indoor.yaml (living room, master bedroom)
 - See: lighting-indoor.md
 
 **Battery Monitoring:**
 - Motion sensor, door sensors, and temperature sensor batteries monitored separately
-- Two-level battery alerts (30% and 15%)
+- Single-level battery alerts (25% threshold)
 - See: battery-monitoring-system.md
 
 ---
@@ -237,14 +236,14 @@ When vacation mode is active, monitors all three garage sensors (motion and both
 - Check entity name in garage.yaml matches actual sensor
 
 **Away alerts not firing:**
-- Confirm `input_boolean.vacation_mode` is on
+- Confirm `input_boolean.house_unoccupied` is on (requires 8h no main floor motion)
 - Check `input_boolean.garage_away_alert_active` state in Developer Tools
-- If boolean is stuck on after returning home, turn vacation mode off to force reset
+- If boolean is stuck on after returning home, check `binary_sensor.main_floor_occupancy` is reporting correctly — occupancy return should auto-reset all state
 - Verify all three sensor entities are reporting correctly
 
 **Away alerts firing when not away:**
-- Confirm vacation mode was turned off after returning home
-- Widget on Android home screen should show current state
+- Check `input_boolean.house_unoccupied` — if main floor has been absent 8+ hours, this is expected
+- If occupancy has returned and the boolean is still on, verify `binary_sensor.main_floor_occupancy` is reporting motion correctly
 
 ---
 

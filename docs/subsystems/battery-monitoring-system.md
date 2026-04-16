@@ -93,14 +93,14 @@ Devices are auto-discovered via `device_class: battery`. The list below reflects
 
 ### Safety-Critical Devices (9)
 1. Basement Smoke/CO
-2. Dan Bedroom Smoke Alarm
+2. South Bedroom Smoke Alarm
 3. Den Smoke Alarm
 4. Dining Room Smoke/CO
 5. Fire CO Alarm
 6. Garage Smoke Alarm
 7. Master Bedroom Smoke/CO
 8. Office Smoke Alarm
-9. Sarah Bedroom Smoke Alarm
+9. East Suite Smoke Alarm
 
 **Battery Type:** YoLink replaceable batteries (typically AA)
 **Expected Life:** 5+ years
@@ -123,7 +123,7 @@ Devices are auto-discovered via `device_class: battery`. The list below reflects
 **Expected Life:** 2-3 years
 **Critical:** Early leak detection prevents major water damage
 
-### Environmental Monitoring (7)
+### Environmental Monitoring (9)
 15. Basement Humidity Sensor
 16. Garage Freezer Temp
 17. Garage Fridge Temp
@@ -131,21 +131,30 @@ Devices are auto-discovered via `device_class: battery`. The list below reflects
 19. Kitchen Fridge Temp
 20. Laundry Temp/Humidity
 21. Master Bath Temp/Humidity
+22. Middle Bath Humidity
+23. East Suite Bathroom Humidity
 
 **Battery Type:** YoLink AA batteries
 **Expected Life:** 2-3 years
 **Purpose:** Monitor HVAC performance and appliance status
 
 ### Sump Pump System (2)
-22. Sump Pump Depth Alert
-23. Sump Pump Running Sensor
+24. Sump Pump Depth Alert
+25. Sump Pump Running Sensor
 
 **Battery Type:** YoLink AA batteries
 **Expected Life:** 2-3 years
 **Critical:** Backup pump monitoring prevents basement flooding
 
+### Motion Sensors (1)
+26. Garage Motion Sensor
+
+**Battery Type:** YoLink AA batteries
+**Expected Life:** 2-3 years
+**Purpose:** Garage activity detection
+
 ### Access Control (1)
-24. Front Door (Ring 2 Doorbell)
+27. Front Door (Ring 2 Doorbell)
 
 **Battery Type:** Ring rechargeable battery pack
 **Recharge Method:** Micro USB adapter
@@ -263,7 +272,7 @@ View Traces -> Check last trigger details
 **AA (YoLink Devices):**
 - Smoke/CO detectors (9x)
 - Temp/humidity sensors (7x)
-- Leak sensors (4x)
+- Leak sensors (3x)
 - Sump pump sensors (2x)
 - Motion sensors (1x)
 - Door sensors (2x)

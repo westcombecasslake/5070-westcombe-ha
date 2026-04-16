@@ -341,7 +341,7 @@ All thresholds were calibrated from 2 days of actual sensor history (Feb 13-14, 
 
 ### Battery Monitoring
 - Sensor batteries monitored separately
-- Two-level battery alerts (30% and 15%)
+- Single-level battery alerts (25% threshold)
 - See: battery-monitoring-system.md
 
 ### Pushover Notifications
@@ -386,7 +386,7 @@ All thresholds were calibrated from 2 days of actual sensor history (Feb 13-14, 
 
 **Check Automation Status:**
 - Settings → Automations → Search "fridge" or "freezer"
-- Verify all 20 automations are enabled
+- Verify all 16 automations are enabled
 - Check automation traces for errors
 
 ### Actual Failures
@@ -485,7 +485,7 @@ All thresholds were calibrated from 2 days of actual sensor history (Feb 13-14, 
 - **No False Positives:** Grocery loading spikes ignored by design
 - **Recovery Confirmation:** Always notified when temperature normalizes
 - **Four Appliances:** Each monitored independently with tailored thresholds
-- **16 Automations:** 4 per appliance (warn, door, compressor, recovery) plus 4 alert state helpers
+- **16 Automations:** 4 per appliance (warn, door, compressor, recovery)
 - **YoLink Platform:** Requires YoLink Hub and active integration
 - **Battery Separate:** Battery monitoring handled by batteryalerts.yaml
 - **Non-HVAC Garage:** Garage thresholds account for seasonal variations

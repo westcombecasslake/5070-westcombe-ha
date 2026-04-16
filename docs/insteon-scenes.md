@@ -65,8 +65,8 @@ The spreadsheet contains:
 
 #### Garage Lights (0x14)
 - **Devices:** `light.garage_lights_garage`, `switch.garage_lights_mudroom`
-- **Purpose:** 3-way lighting between garage and mudroom
-- **Sensor:** `binary_sensor.garage_motion` triggers scene
+- **Purpose:** Coordinated control of 2 Insteon switches for garage lighting
+- **Trigger:** YoLink motion sensor (`binary_sensor.garage_motion`) and YoLink door sensors via garage.yaml automation
 
 #### Premise Lights (0x15)
 - **Purpose:** Master exterior lighting scene - all outdoor lights
@@ -131,6 +131,9 @@ The spreadsheet contains:
 ## Scene Usage in Automations
 
 ### Referenced in YAML Files
+
+**garage.yaml:**
+- Garage Lights (0x14) - Motion and door-activated lighting
 
 **lightingpremise.yaml:**
 - Premise Lights (0x15) - Sunset activation
