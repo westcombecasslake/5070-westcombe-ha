@@ -37,7 +37,8 @@ script:
             {% set ns = namespace(msg='') %}
             {% for sensor in states.sensor
                | selectattr('attributes.device_class', 'eq', 'battery')
-               | rejectattr('entity_id', 'in', integration_entities('mobile_app')) %}
+               | rejectattr('entity_id', 'in', integration_entities('mobile_app'))
+               | rejectattr('entity_id', 'in', ['sensor.patio_speaker_battery']) %}
               {% if sensor.state == 'unavailable' %}
                 {% set ns.msg = ns.msg + device_name(sensor.entity_id) + ': Unavailable\n' %}
               {% elif sensor.state | float(-1) <= 25 and sensor.state | float(-1) >= 0 %}
@@ -66,6 +67,7 @@ script:
             {% set sensors = states.sensor
                | selectattr('attributes.device_class', 'eq', 'battery')
                | rejectattr('entity_id', 'in', integration_entities('mobile_app'))
+               | rejectattr('entity_id', 'in', ['sensor.patio_speaker_battery'])
                | list %}
             {% set unavailable = sensors
                | selectattr('state', 'equalto', 'unavailable')
@@ -112,7 +114,8 @@ automation:
             {% set ns = namespace(items=[]) %}
             {% for sensor in states.sensor
                | selectattr('attributes.device_class', 'eq', 'battery')
-               | rejectattr('entity_id', 'in', integration_entities('mobile_app')) %}
+               | rejectattr('entity_id', 'in', integration_entities('mobile_app'))
+               | rejectattr('entity_id', 'in', ['sensor.patio_speaker_battery']) %}
               {% if sensor.state == 'unavailable' %}
                 {% set ns.items = ns.items + [device_name(sensor.entity_id) + ': Unavailable'] %}
               {% elif sensor.state | float(-1) <= 25 and sensor.state | float(-1) >= 0 %}

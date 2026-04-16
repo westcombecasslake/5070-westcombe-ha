@@ -2,7 +2,7 @@
 
 ## Overview
 
-The battery monitoring system tracks all battery-powered devices in the home automation system and sends alerts based on battery levels. Devices are auto-discovered by `device_class: battery` — no hardcoded entity list is required, and new devices are included automatically. Mobile devices (phones, tablets) are excluded from all monitoring.
+The battery monitoring system tracks all battery-powered IoT devices in the home automation system and sends alerts based on battery levels. Devices are auto-discovered by `device_class: battery` — no hardcoded entity list is required, and new devices are included automatically. Non-IoT devices (phones, tablets, speakers, etc.) are excluded from all monitoring.
 
 ---
 
@@ -19,7 +19,7 @@ The battery monitoring system tracks all battery-powered devices in the home aut
 
 **Dependencies:**
 - Pushover integration (`notify.battery_alerts`)
-- All battery sensors discovered via `device_class: battery` (mobile devices excluded)
+- All battery sensors discovered via `device_class: battery` (non-IoT devices excluded)
 
 ---
 
@@ -39,10 +39,10 @@ The battery monitoring system tracks all battery-powered devices in the home aut
             |                               |
             v                               v
     Battery <= 25% or unavailable       All batteries > 25%
-            |                               |
-            v                               v
-   +-----------------+                  No notification
-   | Battery Alerts  |                  (silent night)
+            |                               v
+            v                          No notification
+   +-----------------+                 (silent night)
+   | Battery Alerts  |
    |   (Normal 0)    |
    +-----------------+
             |
@@ -75,9 +75,21 @@ Message: Front Door: 22%
 
 ---
 
+## Device Exclusions
+
+### Automatic Exclusions (Integration-Based)
+Mobile devices are excluded automatically via the `mobile_app` integration filter. Any phone or tablet using the Home Assistant companion app is excluded without any manual configuration.
+
+### Manual Exclusions (Entity-Based)
+Non-IoT consumer devices such as phones and speakers are excluded individually. These devices report battery state but are not home automation sensors — including them would generate noise.
+
+To add, remove, or review manually excluded entities, search for `rejectattr('entity_id', 'in',` in `/config/packages/batteryalerts.yaml`. The same filter appears in **3 places** (both scripts and the automation) and all 3 must be kept in sync.
+
+---
+
 ## Monitored Devices
 
-Devices are auto-discovered via `device_class: battery`. The list below reflects current known devices but does not need to be maintained manually — any new device with a battery sensor is included automatically.
+Devices are auto-discovered via `device_class: battery`. The list below reflects current known devices but does not need to be maintained manually — any new IoT device with a battery sensor is included automatically.
 
 ### Safety-Critical Devices (9)
 1. Basement Smoke/CO
@@ -177,8 +189,8 @@ Action:
 
 **Auto-Discovery:**
 - Uses `device_class: battery` to find all battery sensors automatically
-- Mobile devices excluded via `integration_entities('mobile_app')`
-- New devices included without any configuration changes
+- Non-IoT devices excluded via integration filter and manual entity exclusions
+- New IoT devices included without any configuration changes
 
 **Template Usage:**
 - Iterates `states.sensor` filtered by `device_class: battery`
@@ -336,7 +348,7 @@ Test with Developer Tools -> Services
 
 **Check:**
 1. Battery sensor entity has `device_class: battery` attribute
-2. Entity is not from the `mobile_app` integration
+2. Entity is not excluded — check both the `mobile_app` integration filter and the manual exclusion list in `/config/packages/batteryalerts.yaml`
 3. Automation is enabled
 4. Pushover service configured correctly
 
@@ -426,8 +438,10 @@ Entity: input_text.battery_status
 
 **Package File:** `/config/packages/batteryalerts.yaml`
 **Integration:** Settings -> Integrations -> Pushover
-**Monitored Sensors:** All entities with `device_class: battery`, excluding `mobile_app`
-**Not Monitored:** Ecobee remote sensor (binary HomeKit reporting), mobile devices
+**Monitored Sensors:** All IoT entities with `device_class: battery`
+**Excluded — Integration:** All `mobile_app` entities (phones, tablets) excluded automatically
+**Excluded — Manual:** Non-IoT consumer devices (e.g. speakers); see `rejectattr('entity_id', 'in',` in `/config/packages/batteryalerts.yaml`
+**Not Monitored:** Ecobee remote sensor (binary HomeKit reporting)
 
 ### Support
 

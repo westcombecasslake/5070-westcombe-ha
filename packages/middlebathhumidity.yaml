@@ -1,12 +1,9 @@
 # ==================================================
 # Middle Bath Humidity Control
 #
-# Automatic exhaust fan control based on relative humidity rise
-# detection (shower events). Uses baseline tracking to work correctly
-# regardless of seasonal outdoor humidity levels.
-#
 # Features:
 #   - Relative rise detection, works year-round
+#   - Rate-of-rise gate filters ambient drift from shower events
 #   - 5-minute comfort delay before fan turns on
 #   - Flat 20-minute runtime per HVAC guidelines
 #   - 2-hour safety timeout (backstop only)
@@ -64,6 +61,7 @@ automation:
           loop_start: "{{ states('input_number.middle_bath_fan_loop_start') | float(0) }}"
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
+          last_reading_age: "{{ (time_now - as_timestamp(states.sensor.middle_bath_humidity.last_changed)) | float(0) }}"
 
       - service: input_number.set_value
         target:
@@ -112,6 +110,11 @@ automation:
           # Case 2: Full shower cycle
           # Detect → comfort delay → fan on → 20-min run
           # → fan off → reset → HVAC boost.
+          #
+          # Detection requires both:
+          #   - Rise >= threshold (8% below 50%, 5% above 50%)
+          #   - Last sensor reading within 15 minutes
+          #     (filters slow ambient drift from hourly reports)
           # --------------------------------------------------
           - conditions:
               - condition: template
@@ -121,9 +124,12 @@ automation:
                   - conditions:
                       - condition: template
                         value_template: >
-                          {% set threshold = 8 if current_humidity < 50 else 8 %}
-                          {{ peak > 0 and (current_humidity - peak) >= threshold }}
+                          {% set threshold = 8 if current_humidity < 50 else 5 %}
+                          {{ peak > 0
+                             and (current_humidity - peak) >= threshold
+                             and last_reading_age <= 900 }}
                     sequence:
+                      # Lock baseline and peak at detection time
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.middle_bath_humidity_baseline
@@ -136,6 +142,7 @@ automation:
                           value: "{{ current_humidity | float(0) }}"
                       # Comfort delay — 5 minutes
                       - delay: "00:05:00"
+                      # Record start time and turn fan on
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.middle_bath_fan_loop_start
@@ -149,6 +156,7 @@ automation:
                       - service: fan.turn_off
                         target:
                           entity_id: fan.middle_bath_humidity
+                      # Reset all tracking values
                       - service: input_number.set_value
                         target:
                           entity_id: input_number.middle_bath_humidity_baseline
@@ -164,6 +172,7 @@ automation:
                           entity_id: input_number.middle_bath_fan_loop_start
                         data:
                           value: 0
+                      # Coordinate with HVAC system
                       - service: script.hvac_exhaust_boost
                         data: {}
 
