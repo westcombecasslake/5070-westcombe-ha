@@ -1,7 +1,7 @@
 # 5070 Westcombe Home Automation System
 
 **Platform:** Home Assistant (HA Green)  
-**Last Updated:** February 2026  
+**Last Updated:** April 2026  
 **Status:** Fully operational
 
 ---
