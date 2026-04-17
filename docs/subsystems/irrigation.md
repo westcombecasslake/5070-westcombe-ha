@@ -16,7 +16,7 @@ All irrigation control requires the system enable latch to be ON, providing a cl
 
 ### What It Does
 
-Automatically calculates daily irrigation runtime based on outdoor temperature, then runs the irrigation cycle at 7:45 AM if weather conditions are appropriate. Skips irrigation when the weather state indicates active precipitation (rainy, pouring, lightning-rainy, or snowy-rainy).
+Automatically calculates daily irrigation runtime based on outdoor temperature, then runs the irrigation cycle at 7:45 AM if weather conditions are appropriate. Skips irrigation when the weather state indicates active precipitation (rainy, pouring, lightning-rainy, or snowy-rainy), or when the Met.no hourly forecast shows maximum precipitation probability (PoP) over the next 24 hours at or above the configured threshold.
 
 **Rationale:** Temperature-based runtime adjustment matches water needs without manual intervention (25 minutes below 80°F, 45 minutes at 80°F+). Weather checks prevent unnecessary watering after rain, saving water and preventing overwatering. Morning timing (7:45 AM) minimizes evaporation while completing before heat of day.
 
@@ -61,9 +61,8 @@ Automatically calculates daily irrigation runtime based on outdoor temperature, 
 - ID: `irrigation_automatic_morning_cycle`
 - `Irrigation - Automatic Morning Cycle`
 - Trigger: 7:45 AM daily
-- Condition: System enabled AND weather state not rainy/pouring/lightning-rainy/snowy-rainy
+- Condition: System enabled AND weather state not rainy/pouring/lightning-rainy/snowy-rainy AND forecast max PoP < irrigation_pop_threshold
 - Action: Runs irrigation for calculated runtime
-- Note: PoP threshold value is included in the start notification for reference
 
 **YAML:** irrigation.yaml
 
@@ -125,8 +124,8 @@ Provides manual 30-minute irrigation run button for spot watering needs and enfo
 - `input_number.irrigation_zone_runtime` - Auto-calculated runtime (0-60 min)
   - Set by temperature automation, can be manually adjusted
 - `input_number.irrigation_pop_threshold` - Precipitation probability threshold (0-100%)
-  - Displayed in automatic cycle start notifications for reference
-  - Default: No initial value set
+  - Skip fires if Met.no max hourly PoP over next 24h meets or exceeds this value
+  - Default: 40% (per NOAA/extension service guidance)
 
 **Manual Control:**
 - `input_button.irrigation_manual_30min` - Triggers 30-minute manual run
@@ -170,7 +169,7 @@ Provides manual 30-minute irrigation run button for spot watering needs and enfo
 
 **Irrigation not running on schedule:**
 - Verify `input_boolean.irrigation_system_enabled` is ON
-- Check recent weather state — skip only triggers on active precipitation states (rainy/pouring/lightning-rainy/snowy-rainy); precipitation probability threshold is not used in skip logic
+- Check recent weather state — skips on active precipitation states (rainy/pouring/lightning-rainy/snowy-rainy) OR if Met.no forecast max PoP over next 24h >= irrigation_pop_threshold
 - Review `input_number.irrigation_zone_runtime` - should be 25 or 45 min
 - Check `weather.forecast_home_2` is updating correctly
 
@@ -191,7 +190,8 @@ Provides manual 30-minute irrigation run button for spot watering needs and enfo
 - Disable system via `input_boolean.irrigation_system_enabled`
 
 **Irrigation skipping too many days:**
-- Skip only triggers on active precipitation states (rainy/pouring/lightning-rainy/snowy-rainy)
+- Skip triggers on active precipitation states OR forecast PoP >= threshold — check both
+- Raise `input_number.irrigation_pop_threshold` if PoP skips are too aggressive
 - Check `weather.forecast_home_2` state when skip occurs
 - Review weather forecast accuracy for location
 

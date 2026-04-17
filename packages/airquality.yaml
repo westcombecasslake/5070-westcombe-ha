@@ -18,7 +18,7 @@
 # * 2x IKEA Alpstuga sensors (CO2, PM2.5)
 #   - Floor 1: Living area (sensor.living_area_co2, sensor.living_area_pm25)
 #   - Floor 2: Master bedroom (sensor.master_bedroom_co2, sensor.master_bedroom_pm25)
-# * HVAC fan with HEPA 13 + carbon filter (climate.ecobee via script)
+# * HVAC fan with HEPA 13 + carbon filter (climate.main_floor via script)
 # * Exhaust fans: bathroom, laundry, kitchen hood
 #
 # THRESHOLDS (EPA/WHO Guidelines):

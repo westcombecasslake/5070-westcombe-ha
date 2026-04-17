@@ -15,7 +15,8 @@
 # - YoLink door sensor wired to Functional Devices power sensor
 # - Binary sensor entity: binary_sensor.sump_pump_running
 # - Weather integration: Met.no (weather.forecast_home_2)
-# - Depth bobber: binary_sensor.sump_pump_depth_alert_door (on=Normal, off=HIGH!)
+# - Rainfall proxy: weather state mapped to approximate inches (pouring=0.75, rainy=0.25, other=0)
+# - Depth bobber: binary_sensor.sump_pump_depth_alert_door (off=Normal, on=HIGH!)
 # - Leak sensor: binary_sensor.sump_leak_sensor_moisture (off=Dry, on=WET!)
 # - Notifications via Pushover (see Operational Log, House Alerts, House Notices)
 #
@@ -83,8 +84,14 @@ template:
       - name: "Rainfall 24 Hours"
         unit_of_measurement: "in"
         state: >
-          {% set rain = state_attr('weather.forecast_home_2', 'precipitation') | float(0) %}
-          {{ rain | round(2) }}
+          {% set weather = states('weather.forecast_home_2') %}
+          {% if weather == 'pouring' %}
+            0.75
+          {% elif weather in ['rainy', 'lightning-rainy', 'snowy-rainy'] %}
+            0.25
+          {% else %}
+            0.0
+          {% endif %}
         icon: mdi:weather-rainy
 
       - name: "Sump Pump Hours Since Last Cycle"
@@ -192,7 +199,7 @@ automation:
     mode: single
     trigger:
       - platform: time
-        at: "18:00:00"
+        at: "23:50:00"
     condition:
       - condition: template
         value_template: >
@@ -255,5 +262,46 @@ automation:
           message: |
             Pump cycled after {{ states('sensor.sump_pump_hours_since_last_cycle') | round(0) }} hours idle
             Monitoring resumed
-            
+
             Sump Water Depth: {% if is_state('binary_sensor.sump_pump_depth_alert_door', 'off') %}Normal{% else %}HIGH!{% endif %} | Floor: {% if is_state('binary_sensor.sump_leak_sensor_moisture', 'on') %}WET!{% else %}Dry{% endif %}
+
+  - id: sump_pump_high_water_alert
+    alias: Sump Pump High Water Alert
+    description: Alert when depth sensor indicates HIGH WATER
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.sump_pump_depth_alert_door
+        to: "on"
+        for: "00:00:30"
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.from_state.state not in ['unavailable', 'unknown'] }}
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "🚨 Sump HIGH WATER"
+          message: |
+            Depth sensor: HIGH WATER
+            Floor moisture: {% if is_state('binary_sensor.sump_leak_sensor_moisture', 'on') %}WET!{% else %}Dry{% endif %}
+
+  - id: sump_pump_high_water_cleared
+    alias: Sump Pump High Water Cleared
+    description: Notify when depth sensor returns to normal after HIGH WATER
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.sump_pump_depth_alert_door
+        to: "off"
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.from_state.state == 'on' }}
+    action:
+      - service: notify.house_alerts
+        data:
+          title: "✓ Sump Depth Normal"
+          message: |
+            Depth sensor: Normal
+            Floor moisture: {% if is_state('binary_sensor.sump_leak_sensor_moisture', 'on') %}WET!{% else %}Dry{% endif %}

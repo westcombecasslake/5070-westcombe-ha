@@ -198,7 +198,7 @@ Comprehensive monitoring with adaptive failure detection based on rainfall corre
 - **Letzgo SB2 bobber switch** - Mechanical float
 - **Insteon 2450 I/O module** (70.7C.5F) - Interface to HA
 - Entity: `binary_sensor.sump_pump_depth_alert_door`
-- States: `on` = Normal depth | `off` = HIGH WATER ALERT
+- States: `off` = Normal depth | `on` = HIGH WATER ALERT
 
 **Floor Moisture:**
 - **YoLink leak sensor** - Floor moisture detection
@@ -263,7 +263,7 @@ Message: No pump activity in [X] hours
 #### Activity Drop Detection
 
 ```yaml
-Trigger: Daily at 6:00 PM
+Trigger: Daily at 11:50 PM
 Condition:
   - Today's cycles < 50% of 7-day average
   - 7-day average > 5 cycles

@@ -323,7 +323,7 @@ automation:
       # Shut down HVAC fan — stops circulating smoke/CO through ducts
       - service: climate.set_fan_mode
         target:
-          entity_id: climate.ecobee
+          device_id: c38113c2d02da790b689d4a3bdc4b5e1
         data:
           fan_mode: "auto"
       # Turn off all 4 bath exhaust fans

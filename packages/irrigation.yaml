@@ -15,8 +15,8 @@
 #
 # WEATHER SKIP:
 # - Skips if weather state is rainy/pouring/lightning-rainy/snowy-rainy
-# - PoP threshold helper (irrigation_pop_threshold) is defined and displays
-#   in automatic cycle notifications for reference; not used in skip logic.
+# - Skips if Met.no hourly forecast max PoP over next 24h >= irrigation_pop_threshold
+# - PoP threshold default 40% per NOAA/extension service guidance
 #
 # NOTIFICATIONS:
 # - operational_log: automatic cycle start
@@ -100,6 +100,16 @@ automation:
         value_template: >
           {{ states('weather.forecast_home_2') not in ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] }}
     action:
+      - service: weather.get_forecasts
+        target:
+          entity_id: weather.forecast_home_2
+        data:
+          type: hourly
+        response_variable: forecast_data
+      - variables:
+          max_pop: "{{ forecast_data['weather.forecast_home_2']['forecast'][:24] | map(attribute='precipitation_probability') | list | max | default(0) }}"
+      - condition: template
+        value_template: "{{ max_pop < states('input_number.irrigation_pop_threshold') | int }}"
       - service: notify.operational_log
         data:
           title: "Irrigation - Automatic Cycle Started"
