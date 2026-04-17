@@ -17,11 +17,11 @@ that gets pasted back into the Sheet.
     │   Home Assistant    │           │  TSV / Sheet            │
     │                     │           │  (Home Owner)           │
     ├─────────────────────┤           ├─────────────────────────┤
-    │ PK  Device Name     │───────────│ PK  Device Name         │
-    │     Location        │           │     Model               │
-    │     Subsystem       │           │     SN/ID               │
-    │     Integration     │           │     Notes               │
-    │     Entity ID(s)    │           └─────────────────────────┘
+    │     Device Name     │───────────│     Model               │
+    │     Location        │           │     SN/ID               │
+    │     Subsystem       │           │     Notes               │
+    │     Integration     │           └─────────────────────────┘                    │
+    │     Entity ID(s)    │           
     └─────────────────────┘
 
 Changes and deletions flow from HA outward. Claude Code validates HA against the TSV,
