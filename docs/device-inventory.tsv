@@ -1,79 +1,82 @@
-HA Location / Room	Location Details	HA Domain	Common Name	HA Entity IDs	Function	Type	Integration	Device	Device ID / SN	FW	Notes
-Back Patio	Front window near bathroom	Lighting Premise	Back Patio Lights	switch.back_patio_living_room	Back Patio Lights	Insteon	Insteon	PS01	61.83.75	v.54
-Back Patio	Doorwall left	Lighting Premise	Back Patio Lights	switch.back_patio_kitchen	Back Patio Lights	Insteon	Insteon	PS01	61.8D.B0	v.54
-Backyard	Back door left gang	Lighting Premise	Back Floods	switch.back_floods	Back Floods	Insteon	Insteon	PS01	60.2B.D3	v.54	Backyard floods
-Basement	Under basement stairs	Smoke/CO	Basement Smoke CO	<Multiple>	Basement Smoke CO	Sensor	YoLink	YS7A01-UC	SN:FBC38CFBE9		Installed 2/2024
-Basement	Header high middle south wall	HVAC	Humidity	sensor.basement_humidity_sensor_humidity	Humidity	Sensor	YoLink	YS8003	SN:4EDC2949CE		Controls humidifier via appliance module
-Basement	Floor in front of hot water heater		Hot Water Heater Leak Sensor	binary_sensor.hot_water_heater_leak_sensor_moisture	Leak Sensors	Sensor	YoLink	YS7903-UC	SN:6AC0DF966C
-Basement	Floor in back up sump pump		Sump Leak Sensor	binary_sensor.sump_leak_sensor_moisture	Leak Sensors	Sensor	YoLink	YS7903-UC	SN:93B0C9561C
-Basement	Mounted on jbox on wall, right side		Sump Pump Depth Alert	binary_sensor.sump_pump_depth_alert_door	Sump Pump	Sensor	YoLink	YS7707-UC	SN:3F9B52BE43
-Basement	Mounted on jbox on wall, right side. Power sensor in jbox		Sump Pump Running	binary_sensor.sump_pump_running	Sump Pump	Sensor	YoLink	YS7707-UC	SN:63B6526CEC
-Basement	Floor in front of well		Well Leak Sensor	binary_sensor.well_leak_sensor_moisture	Leak Sensors	Sensor	YoLink	YS7903-UC	SN:3CB811CDB7
-Basement	Near Hot Water Heater	Powerline Support	Scheduled Power Save	switch.scheduled_power_save	Scheduled Power Save	Insteon	Insteon	2635-222	70.29.D7	v.48	DTE Demand Price - Shut off Dehumid during demand pricing
-Den	Ceiling near entry	Smoke/CO	Den Smoke	<Multiple>	Den Smoke	Sensor	YoLink	YS7A02-UC	SN:F076C89F79		Installed 2/2024
-Dining Room	Ceiling near kitchen entry	Smoke/CO	Living area Smoke CO	<Multiple>	Living Area Smoke CO	Sensor	YoLink	YS7A01-UC	SN:87806D927D		Installed 2/2024
-Dining Room	Table on north wall	Environmental	CO2 / PM2 Monitor	<Multiple>	Air Quality Monitor	Sensor	Thread	12289	TBD	Alpstuga	Ikea
-Dining Room	Near window	Lighting Indoor	Seasonal Indoor	switch.dining_room_seasonal	Seasonal Indoor	Insteon	Insteon	2856D2	70.20.38	v.43	Christmas lights
-Dining Room	Wall by staris	Lighting Indoor	Dinning Room Table Lights		Insteon	Insteon	PS01	60.2A.F5	v.54
-Dining Room	Wall by staris	Lighting Indoor	Dinning Room Table Lights		Insteon	Insteon	PS01	60.58.FC	v.54
-East Suite	Ceiling over entry	Smoke 	East Suite Smoke	<Multiple>	Smoke	Sensor	YoLink	YS7A02-UC	SN:E958B19405		Installed 2/2024
-East Suite Bathroom	On outside wall by shower		East Suite Bath Temp Humidity Sensor	sensor.east_suite_bathroom_humidity	Humidity Monitoring	Sensor	YoLink	YS8003-UC	TBD
-East Suite Bathroom	2 gang switch by door, right	HVAC	East Suite Bathroom Fan Switch	fan.east_suite_bathroom_humidity	Fan control	Switch	Thread	VTM35-SN	TBD		Inovelli
-Entry Bath	Left gang	Lighting Indoor	Bathroom fan off timer	light.entry_bath_fan	Bathroom fan off timer	Insteon	Insteon	PS01	61.87.D0	v.54
-Exterior	Landscape light switch	Lighting Premise	Seasonal Outside	light.entry_closet_premise	Seasonal Outside	Insteon	Insteon	PS01	61.8A.DF	v.54
-Front Door	Front window near bathroom: Botom	Lighting Indoor	Seasonal Indoor	switch.front_door_outlet_bottom	Seasonal Indoor	--	Insteon	WR01 Top	60.71.E4 1	v.54	Indo
-Front Door	Front window near bathroom: Botom	Lighting Indoor	Seasonal Indoor	switch.front_door_outlet_bottom	Seasonal Indoor	--	Insteon	WR01 Bottom	60.71.E4 2	v.54	Indoor string lights
-Front Porch	Jan's door	Lighting Premise	Override Front Outlets	switch.front_porch_override	Override Front Outlets	Insteon	Insteon	PS01	60.5B.1D	v.54
-Garage	Freezer	Alerts	Fridge Temp Alarm	sensor.garage_freezer_temp_temperature	Freezer Temp Alarm	Sensor	YoLink	YS8003	SN:BFD13F878A
-Garage	Above Fridge	Smoke/CO	Garage Smoke Sensor	<Multiple>	Garage Smoke Sensor	Sensor	YoLink	YS7A02-UC	SN:A03FCE857A		Installed 2/2024
-Garage	Fridge	Alerts	Fridge Temp Alarm	sensor.garage_fridge_temp_temperature	Fridge Temp Alarm	Sensor	YoLink	YS8003	SN:2F2F4423E5
-Garage	On top of fridge		Garage Motion Sensor	binary_sensor.garage_motion	Safety Monitoring	Sensor	YoLink	YS7805-UC	SN:342296324E
-Garage	Back wall	Garage	Noise Filter	Physical	Noise Filter	N/A	None	1626-10	Isolate camper charger	Insteon	Powerline Support
-Garage	Right switch	Garage	Garage Lights Motion	light.garage_lights_garage	GAR Lights Motion	Insteon	Insteon	PS01	60.2A.8F	v.54	3-way with mudroom
-Gazebo	Doorwall left	Lighting Premise	Gazebi Lights	switch.gazebo_lights_kitchen	Gazebo Lights	Insteon	Insteon	PS01	60.51.81	v.54	Controls Gazebo scene
-Gazebo	Left of doorwall	Lighting Premise	Gazebo light	switch.gazebo_led_power	Gazebo Light	Insteon	Insteon	WR01 Bottom	60.4E.B0 2	v.54
-Gazebo	Gazebo post	Lighting Premise	Gazebo Lights	switch.gazebo_wireless_remote	Gazebo Lights	Insteon	Insteon	2342-2	70.86.D8	v.39	Wireless remote
-Kitchen	Freezer	Alerts	Freezer Temp Alarm	sensor.kitchen_freezer_temp_temperature	Freezer Temp Alarm	Sensor	YoLink	YS8003	SN:57BE45EB83
-Kitchen	Fridge	Alerts	Freezer Temp Alarm	sensor.kitchen_fridge_temp_temperature	Fridge Temp Alarm	Sensor	YoLink	YS8003	SN:4EDDDC2EEB
-Kitchen	3 gang middle	Lighting Indoor	Kitchen Lights	switch.kitchen_lights_back	Kitchen Lights	Insteon	Insteon	PS01	60.55.8F	v.54	Back lights
-Kitchen	3 gang middle	Lighting Indoor	Kitchen Lights	switch.kitchen_lights_middle	Kitchen Lights	Insteon	Insteon	PS01	60.5C.79	v.54	Middle lights
-Kitchen	Right of doorwall, ebedded behind blank	Powerline Support	Vent Hood Reset	switch.vent_hood_reset	Vent Hood Reset	Insteon	Insteon	2443-222	70.B8.2C	v.49	Daily reset at 5am
-Kitchen	Left of sink, embedded behind switch	Lighting Indoor	Kitchen Lights	switch.kitchen_lights_sink	Kitchen Lights	Insteon	Insteon	2443-222	71.E9.C1	v.49	Bay Window
-Kitchen	Nook with drawers	Lighting Indoor	Kichen Lights		Kitchen Lights	Insteon	Insteon	PS-01	60.26.5B	v.54
-Laundry	Temp & Humidity Sensor	HVAC	Fan control	<Multiple>	Fan control	Sensor	YoLink	YS8003	SN:9325BC346D
-Laundry	Back wall outlet	HVAC	Dryer Monitor	sensor.dryer_monitor_current_power	Dryer Monitor	Smart Plug	YoLink	YS6602-UC	SN:71D057598D		Controls laundry fan
-Laundry	Entry door	Lighting Indoor	Fan off timer sensor	light.laundry_fan_timer	Fan off timer	Insteon	Insteon	PS01	61.88.84	v.54	Controlled by YoLink sensor
-Living Room	Bottom shelf TV rack	System Infrastructure	Yolink Hub 2 Speaker	device.yolink_hub	YoLink Hub 2 Speaker	Hub	YoLink	YS1604-UC	SN:78B6B7630E
-Living Room	Behind TV stand	Living Room	Noise Filter	Physical	Noise Filter	N/A	None	1626-10	Isolate TV Electronics	Insteon	Powerline Support
-Living Room	Behind TV stand	System Infrastructure	Powelinc Modem (PLM)	device.insteon_plm	Powerline Modem	Insteon	Insteon	2413U	70.8C.C1	2.7 2023	Only shows up in Insteon Integration, not device lists
-Living Room	Embedded in single gang covered plate	Lighting Indoor	Over TV Flood- Remote	switch.living_room_over_tv_flood_remote	Over TV Flood Remote	Insteon	Insteon	2443-222	71.E8.B1	v.49
-Living Room	Kitchen side lamp	Lighting Indoor	Lamps	switch.living_room_lamp_kitchen_side	Lamps	Insteon	Insteon	2457D2	70.1C.6E	v.43
-Living Room	Window right fireplace	Lighting Indoor	Seasonal Indoor	switch.living_room_hearth_lights	Seasonal Indoor	Insteon	Insteon	2457D2	70.1E.77	v.43
-Living Room	Behind TV stand	Lighting Indoor	Seasonal Indoor	switch.living_room_tv_stand_seasonal	Seasonal Indoor	Insteon	Insteon	2635-222	70.2E.42	v.48
-Living Room	Back corner lamp	Lighting Indoor	Lamp	switch.living_room_lamp_back_corner	Lamp	Insteon	Insteon	2856D2	70.1D.80	v.43	Hearth lights
-Living Room	Left of den door	Lighting Indoor	Seasonal Indoor	switch.living_room_christmas_tree	Seasonal Indoor	Insteon	Insteon	2856D2	70.1D.E6	v.43	Christmas tree
-Living Room	Center wall	Lighting Indoor	Couch recessed	switch.living_room_couch_recessed	Couch recessed	Insteon	Insteon	PS01	60.56.24	v.54
-Living Room	Left wall	Lighting Indoor	Lamps	switch.living_room_seasonal_manual	Seasonal Lights Manual	Insteon	Insteon	PS01	60.57.92	v.54
-Living Room	Right wall	Lighting Indoor	Over TV Flood- Control	switch.living_room_over_tv_flood_control	Over TV Flood Control	Insteon	Insteon	PS01	61.8D.55	v.54
-Living Room	Bottom shelf TV rack	System Infrastructure	System Controller	device.insteon_plm	System Controller	Hub	Insteon	UDI eISY	00:21:b9:02:66:63		Legacy controller
-Living Room	Window Lamp	Lighting Indoor	Lamps	switch.living_room_lamp_kitchen_side	Lamps	Insteon	Insteon	2457D2	71.DE.AB	v.43
-Main Floor	West Wall	HVAC	Thermostat	climate.ecobee_main_floor	Thermostat	Thermostat	Ecobee	Ecobee	SN:522679989982	4.8.7.222	Smart Thermostat with Voice Control
-Master Bath	Temp & Humidity Sensor	HVAC	Fan control	<Multiple>	Fan control	Sensor	YoLink	YS8003	SN:6A224ED478
-Master Bath	Left of 3 by shower	Lighting Indoor	Master Bath Lights	switch.master_bath_lights_shower	Master Bath Lights	Insteon	Insteon	PS01	60.5D.83	v.54
-Master Bath	Right gang by vanity	Lighting Indoor	Master Bath Lights	switch.master_bath_lights_vanity	Master Bath Lights	Insteon	Insteon	PS01	60.60.56	v.54
-Master Bath	Right hand switch	Lighting Indoor	Fan off timer sensor	light.master_bath_fan	Fan off timer	Insteon	Insteon	PS01	61.84.42	v.54
-Master Bedroom	Ceiling over entry	Smoke/CO	Master Bedroom Smoke CO	<Multiple>	Smoke CO	Sensor	YoLink	YS7A01-UC	SN:F88A4B3835		Installed 2/2024
-Master Bedroom	Cabinet on west wall	Environmental	CO2 / PM2 Monitor	<Multiple>	Air Quality Monitor	Sensor	Thread	12289	TBD	Alpstuga	Ikea
-Master Bedroom	Right gang by entry	Lighting Indoor	Master Bath Lights	switch.master_bath_lights_entry	Master Bath Lights	Insteon	Insteon	PS01	60.52.F6	v.54
-Middle Bathroom	Back wall	Smoke/CO	Smoke CO Siren	switch.smoke_co_siren	Smoke CO Siren	Siren	YoLink	YS7103-UC	SN:281B4FEB47		Whole house siren
-Middle Bathroom	On outside wall by shower		Middle Bath Temp Humidity Sensor	sensor.middle_bath_humidity	Humidity Monitoring	Sensor	YoLink	YS8003-UC	SN:2F352BB181
-Middle Bathroom	3 gang switch box, middle	HVAC	Middle Bath Fan Switch	fan.middle_bath_humidity	Fan control	Switch	Thread	VTM35-SN	128-254-0082		Inovelli
-Mudroom	Mudroom right switch	Garage	Garage Lights Motion	switch.garage_lights_mudroom	GAR Lights Motion	Insteon	Insteon	PS01	61.8B.61	v.54	3-way with garage
-Office	Ceiling over entry	Smoke/CO	Smoke	<Multiple>	Smoke	Sensor	YoLink	YS7A02-UC	SN:F462D4B547		Installed 2/2024
-Patio	Outlet right when facing back door	Irrigation	Drip Sprinkler	switch.patio_drip_sprinkler	Drip Sprinkler	--	Insteon	WR01 Top	60.4E.B0 1	v.54	Powers Sprinkler valve via 24VAC transformer
-South Bedroom	Ceiling over entry door	Smoke/CO	Smoke	<Multiple>	Smoke	Sensor	YoLink	YS7A02-UC	SN:CD87276F48		Installed 2/2024
-South Bedroom	Front window	Lighting Premise	Dusk Sensor		Dusk Sensor	N/A	None			Amazon lamp post sensor controlling Insteon embedded module
-South Bedroom	Front window	Lighting Premise	Dusk Sensor	switch.photocell_micro_module	Dusk Sensor	Insteon	Insteon	2443-222	70.B6.BD	v.49	Home made Insteon dusk sensor
-Sump Pit	Sump Pit	Sump Pump	Depth Sensor Bobber		Depth Sensor Bobber	Sensor	Physical	Letzgo SB2	N/A		Connects to 2450
-Sump Pit	At Sump Pump behind furnace	Sump Pump	Sump Pump Power Monitor	switch.sump_pump_power	Sump Pump Power	Insteon	Insteon	2450	70.7C.AB	v.41	On/Off relay connected to Sump Pump Hot Line
-Sump Pump	Sump Pump J Box	controls 2450	Powerline monitor sensor		Powerline monitor sensor	Sensor	Physical	RIB 1 21AJ46	N/A		Senses pump hot lead
+Room	Location	Subsystem	Device Name	Entity ID	Integration	Model	SN/ID	Notes
+Back Patio	Front window near bathroom	Lighting Premise	Back Patio Lights	switch.back_patio_living_room	Insteon	PS01	61.83.75	FW:v.54
+Back Patio	Doorwall left	Lighting Premise	Back Patio Lights	switch.back_patio_kitchen	Insteon	PS01	61.8D.B0	FW:v.54
+Backyard	Back door left gang	Lighting Premise	Back Floods	switch.back_floods	Insteon	PS01	60.2B.D3	FW:v.54 | Backyard floods
+Basement	Under basement stairs	Smoke/CO	Basement Smoke CO	<Multiple>	YoLink	YS7A01-UC	SN:FBC38CFBE9	Installed 2/2024
+Basement	Header high middle south wall	HVAC	Humidity	sensor.basement_humidity_sensor_humidity	YoLink	YS8003	SN:4EDC2949CE	Controls humidifier via appliance module
+Basement	Floor in front of hot water heater	Environmental	Hot Water Heater Leak Sensor	binary_sensor.hot_water_heater_leak_sensor_moisture	YoLink	YS7903-UC	SN:6AC0DF966C	
+Basement	Floor in back up sump pump	Environmental	Sump Leak Sensor	binary_sensor.sump_leak_sensor_moisture	YoLink	YS7903-UC	SN:93B0C9561C	
+Basement	Mounted on jbox on wall, right side	Environmental	Sump Pump Depth Alert	binary_sensor.sump_pump_depth_alert_door	YoLink	YS7707-UC	SN:3F9B52BE43	
+Basement	Mounted on jbox on wall, right side. Power sensor in jbox	Environmental	Sump Pump Running	binary_sensor.sump_pump_running	YoLink	YS7707-UC	SN:63B6526CEC	
+Basement	Floor in front of well	Environmental	Well Leak Sensor	binary_sensor.well_leak_sensor_moisture	YoLink	YS7903-UC	SN:3CB811CDB7	
+Basement	Near Hot Water Heater	Powerline Support	Scheduled Power Save	switch.scheduled_power_save	Insteon	2635-222	70.29.D7	FW:v.48 | DTE Demand Price - Shut off Dehumid during demand pricing
+Den	Ceiling near entry	Smoke/CO	Den Smoke	<Multiple>	YoLink	YS7A02-UC	SN:F076C89F79	Installed 2/2024
+Dining Room	Ceiling near kitchen entry	Smoke/CO	Living area Smoke CO	<Multiple>	YoLink	YS7A01-UC	SN:87806D927D	Installed 2/2024
+Dining Room	Table on north wall	Environmental	CO2 / PM2 Monitor	<Multiple>	Thread	12289	TBD	Ikea
+Dining Room	Near window	Lighting Indoor	Seasonal Indoor	switch.dining_room_seasonal	Insteon	2856D2	70.20.38	FW:v.43 | Christmas lights
+Dining Room	Wall by staris	Lighting Indoor	Dinning Room Table Lights		Insteon	60.2A.F5	v.54	
+Dining Room	Wall by staris	Lighting Indoor	Dinning Room Table Lights		Insteon	60.58.FC	v.54	
+East Suite	Ceiling over entry	Smoke	East Suite Smoke	<Multiple>	YoLink	YS7A02-UC	SN:E958B19405	Installed 2/2024
+East Suite Bathroom	On outside wall by shower	HVAC	East Suite Bath Temp Humidity Sensor	sensor.east_suite_bathroom_humidity	YoLink	YS8003-UC	TBD	
+East Suite Bathroom	2 gang switch by door, right	HVAC	East Suite Bathroom Fan Switch	fan.east_suite_bathroom_humidity	Thread	VTM35-SN	TBD	Inovelli
+Entry Bath	Left gang	Lighting Indoor	Bathroom fan off timer	light.entry_bath_fan	Insteon	PS01	61.87.D0	FW:v.54
+Exterior	Landscape light switch	Lighting Premise	Seasonal Outside	light.entry_closet_premise	Insteon	PS01	61.8A.DF	FW:v.54
+Front Door	Front window near bathroom: Botom	Lighting Indoor	Seasonal Indoor	switch.front_door_outlet_bottom	Insteon	WR01 Top	60.71.E4 1	FW:v.54 | Indo
+Front Door	Front window near bathroom: Botom	Lighting Indoor	Seasonal Indoor	switch.front_door_outlet_bottom	Insteon	WR01 Bottom	60.71.E4 2	FW:v.54 | Indoor string lights
+Front Porch	Jan's door	Lighting Premise	Override Front Outlets	switch.front_porch_override	Insteon	PS01	60.5B.1D	FW:v.54
+Garage	Freezer	Alerts	Fridge Temp Alarm	sensor.garage_freezer_temp_temperature	YoLink	YS8003	SN:BFD13F878A	
+Garage	Above Fridge	Smoke/CO	Garage Smoke Sensor	<Multiple>	YoLink	YS7A02-UC	SN:A03FCE857A	Installed 2/2024
+Garage	Fridge	Alerts	Fridge Temp Alarm	sensor.garage_fridge_temp_temperature	YoLink	YS8003	SN:2F2F4423E5	
+Garage	On top of fridge	Garage	Garage Motion Sensor	binary_sensor.garage_motion	YoLink	YS7805-UC	SN:342296324E	
+Garage	Garage Entry Door	Garage	Garage Entry Door Sensor	binary_sensor.entry_door_garage	YoLink	YS7704-UC	TBD	
+Garage	Back Yard Garage Door	Garage	Back Yard Garage Door Sensor	binary_sensor.back_yard_garage_door_sensor_door	YoLink	YS7704-UC	TBD	
+Garage	Back wall	Garage	Noise Filter		None	1626-10		Powerline Support | Isolate camper charger
+Garage	Right switch	Garage	Garage Lights Motion	light.garage_lights_garage	Insteon	PS01	60.2A.8F	FW:v.54 | 3-way with mudroom
+Gazebo	Doorwall left	Lighting Premise	Gazebi Lights	switch.gazebo_lights_kitchen	Insteon	PS01	60.51.81	FW:v.54 | Controls Gazebo scene
+Gazebo	Left of doorwall	Lighting Premise	Gazebo light	switch.gazebo_led_power	Insteon	WR01 Bottom	60.4E.B0 2	FW:v.54
+Gazebo	Gazebo post	Lighting Premise	Gazebo Lights	switch.gazebo_wireless_remote	Insteon	2342-2	70.86.D8	FW:v.39 | Wireless remote
+Kitchen	Freezer	Alerts	Freezer Temp Alarm	sensor.kitchen_freezer_temp_temperature	YoLink	YS8003	SN:57BE45EB83	
+Kitchen	Fridge	Alerts	Freezer Temp Alarm	sensor.kitchen_fridge_temp_temperature	YoLink	YS8003	SN:4EDDDC2EEB	
+Kitchen	3 gang middle	Lighting Indoor	Kitchen Lights	switch.kitchen_lights_back	Insteon	PS01	60.55.8F	FW:v.54 | Back lights
+Kitchen	3 gang middle	Lighting Indoor	Kitchen Lights	switch.kitchen_lights_middle	Insteon	PS01	60.5C.79	FW:v.54 | Middle lights
+Kitchen	Right of doorwall, ebedded behind blank	Powerline Support	Vent Hood Reset	switch.vent_hood_reset	Insteon	2443-222	70.B8.2C	FW:v.49 | Daily reset at 5am
+Kitchen	Left of sink, embedded behind switch	Lighting Indoor	Kitchen Lights	switch.kitchen_lights_sink	Insteon	2443-222	71.E9.C1	FW:v.49 | Bay Window
+Kitchen	Nook with drawers	Lighting Indoor	Kichen Lights		Insteon	PS-01	60.26.5B	FW:v.54
+Laundry	Temp & Humidity Sensor	HVAC	Fan control	<Multiple>	YoLink	YS8003	SN:9325BC346D	
+Laundry	Back wall outlet	HVAC	Dryer Monitor	sensor.dryer_monitor_current_power	YoLink	YS6602-UC	SN:71D057598D	Controls laundry fan
+Laundry	Upper Outlet behind washer/dryer	HVAC	Washer Monitor	sensor.washer_monitor_current_power	YoLink	YS6602-UC	TBD	
+Laundry	Entry door	Lighting Indoor	Fan off timer sensor	light.laundry_fan_timer	Insteon	PS01	61.88.84	FW:v.54 | Controlled by YoLink sensor
+Living Room	Bottom shelf TV rack	System Infrastructure	Yolink Hub 2 Speaker	device.yolink_hub	YoLink	YS1604-UC	SN:78B6B7630E	
+Living Room	Behind TV stand	Living Room	Noise Filter		None	1626-10		Powerline Support | Isolate TV Electronics
+Living Room	Behind TV stand	System Infrastructure	Powelinc Modem (PLM)	device.insteon_plm	Insteon	2413U	70.8C.C1	FW:2.7 2023 | Only shows up in Insteon Integration, not device lists
+Living Room	Embedded in single gang covered plate	Lighting Indoor	Over TV Flood- Remote	switch.living_room_over_tv_flood_remote	Insteon	2443-222	71.E8.B1	FW:v.49
+Living Room	Kitchen side lamp	Lighting Indoor	Lamps	switch.living_room_lamp_kitchen_side	Insteon	2457D2	70.1C.6E	FW:v.43
+Living Room	Window right fireplace	Lighting Indoor	Seasonal Indoor	switch.living_room_hearth_lights	Insteon	2457D2	70.1E.77	FW:v.43
+Living Room	Behind TV stand	Lighting Indoor	Seasonal Indoor	switch.living_room_tv_stand_seasonal	Insteon	2635-222	70.2E.42	FW:v.48
+Living Room	Back corner lamp	Lighting Indoor	Lamp	switch.living_room_lamp_back_corner	Insteon	2856D2	70.1D.80	FW:v.43 | Hearth lights
+Living Room	Left of den door	Lighting Indoor	Seasonal Indoor	switch.living_room_christmas_tree	Insteon	2856D2	70.1D.E6	FW:v.43 | Christmas tree
+Living Room	Center wall	Lighting Indoor	Couch recessed	switch.living_room_couch_recessed	Insteon	PS01	60.56.24	FW:v.54
+Living Room	Left wall	Lighting Indoor	Lamps	switch.living_room_seasonal_manual	Insteon	PS01	60.57.92	FW:v.54
+Living Room	Right wall	Lighting Indoor	Over TV Flood- Control	switch.living_room_over_tv_flood_control	Insteon	PS01	61.8D.55	FW:v.54
+Living Room	Bottom shelf TV rack	System Infrastructure	System Controller	device.insteon_plm	Insteon	UDI eISY	00:21:b9:02:66:63	Legacy controller
+Living Room	Window Lamp	Lighting Indoor	Lamps	switch.living_room_lamp_kitchen_side	Insteon	2457D2	71.DE.AB	FW:v.43
+Main Floor	West Wall	HVAC	Thermostat	climate.ecobee_main_floor	Ecobee	Ecobee	SN:522679989982	FW:4.8.7.222 | Smart Thermostat with Voice Control
+Master Bath	Temp & Humidity Sensor	HVAC	Fan control	<Multiple>	YoLink	YS8003	SN:6A224ED478	
+Master Bath	Left of 3 by shower	Lighting Indoor	Master Bath Lights	switch.master_bath_lights_shower	Insteon	PS01	60.5D.83	FW:v.54
+Master Bath	Right gang by vanity	Lighting Indoor	Master Bath Lights	switch.master_bath_lights_vanity	Insteon	PS01	60.60.56	FW:v.54
+Master Bath	Right hand switch	Lighting Indoor	Fan off timer sensor	light.master_bath_fan	Insteon	PS01	61.84.42	FW:v.54
+Master Bedroom	Ceiling over entry	Smoke/CO	Master Bedroom Smoke CO	<Multiple>	YoLink	YS7A01-UC	SN:F88A4B3835	Installed 2/2024
+Master Bedroom	Cabinet on west wall	Environmental	CO2 / PM2 Monitor	<Multiple>	Thread	12289	TBD	Ikea
+Master Bedroom	Right gang by entry	Lighting Indoor	Master Bath Lights	switch.master_bath_lights_entry	Insteon	PS01	60.52.F6	FW:v.54
+Middle Bathroom	Back wall	Smoke/CO	Smoke CO Siren	switch.smoke_co_siren	YoLink	YS7103-UC	SN:281B4FEB47	Whole house siren
+Middle Bathroom	On outside wall by shower	HVAC	Middle Bath Temp Humidity Sensor	sensor.middle_bath_humidity	YoLink	YS8003-UC	SN:2F352BB181	
+Middle Bathroom	3 gang switch box, middle	HVAC	Middle Bath Fan Switch	fan.middle_bath_humidity	Thread	VTM35-SN	128-254-0082	Inovelli
+Mudroom	Mudroom right switch	Garage	Garage Lights Motion	switch.garage_lights_mudroom	Insteon	PS01	61.8B.61	FW:v.54 | 3-way with garage
+Office	Ceiling over entry	Smoke/CO	Smoke	<Multiple>	YoLink	YS7A02-UC	SN:F462D4B547	Installed 2/2024
+Patio	Outlet right when facing back door	Irrigation	Drip Sprinkler	switch.patio_drip_sprinkler	Insteon	WR01 Top	60.4E.B0 1	FW:v.54 | Powers Sprinkler valve via 24VAC transformer
+South Bedroom	Ceiling over entry door	Smoke/CO	Smoke	<Multiple>	YoLink	YS7A02-UC	SN:CD87276F48	Installed 2/2024
+South Bedroom	Front window	Lighting Premise	Dusk Sensor		None			FW:Amazon lamp post sensor controlling Insteon embedded module
+South Bedroom	Front window	Lighting Premise	Dusk Sensor	switch.photocell_micro_module	Insteon	2443-222	70.B6.BD	FW:v.49 | Home made Insteon dusk sensor
+Sump Pit	Sump Pit	Sump Pump	Depth Sensor Bobber		Physical	Letzgo SB2	N/A	Connects to 2450
+Sump Pit	At Sump Pump behind furnace	Sump Pump	Sump Pump Power Monitor	switch.sump_pump_power	Insteon	2450	70.7C.AB	FW:v.41 | On/Off relay connected to Sump Pump Hot Line
+Sump Pump	Sump Pump J Box	Sump Pump	Powerline monitor sensor		Physical	RIB 1 21AJ46	N/A	Senses pump hot lead

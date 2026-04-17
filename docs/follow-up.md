@@ -5,6 +5,17 @@ subsystem reviews. These are not bugs -- implement or investigate when ready.
 
 ---
 
+## Device Inventory
+
+**Verify Smoke CO Siren (YS7103-UC)**
+- TSV row 68: Middle Bathroom, `switch.smoke_co_siren`, SN: 281B4FEB47
+- Entity returns 404 and device has no entry in HA device registry
+- Device is referenced in `smokeco.yaml` -- confirm whether it is physically installed and operational, or removed
+- If removed: delete TSV row and remove from smokeco.yaml
+- File: `/homeassistant/docs/device-inventory.tsv`, `/homeassistant/packages/smokeco.yaml`
+
+---
+
 ## Sump Pump
 
 **Verify depth sensor polarity**

@@ -1,85 +1,87 @@
 # Home Assistant Device Inventory
 
-Complete inventory of all devices integrated with Home Assistant, including physical location, entity IDs, and hardware details.
-
-Last Updated: February 2026
+Last Updated: April 2026
 
 ---
 
-## Inventory Summary
+## How This Works
 
-- **Total Devices:** 74
-- **Insteon Devices:** 39
-- **YoLink Devices:** 27
-- **Matter/Thread Devices:** 4
-- **Ring Devices:** 1 (Video Doorbell 2)
-- **Ecobee:** 1
-- **Physical Sensors:** 2
+Most device inventory information lives in Home Assistant — room assignments, subsystems,
+integrations, and entity IDs. But HA has no concept of physical placement, doesn't store
+model names in a useful way, and keeps serial numbers in an internal hex format. Those
+gaps live in a Google Sheet maintained by the home owner. This document describes how to
+keep the two in sync using Claude Code to surface differences and generate an updated TSV
+that gets pasted back into the Sheet.
 
-Note: This summary will lag the Google Sheet as devices are added or removed. The Sheet is the authoritative count.
+    ┌─────────────────────┐           ┌─────────────────────────┐
+    │   Home Assistant    │           │  TSV / Sheet            │
+    │                     │           │  (Home Owner)           │
+    ├─────────────────────┤           ├─────────────────────────┤
+    │ PK  Device Name     │───────────│ PK  Device Name         │
+    │     Location        │           │     Model               │
+    │     Subsystem       │           │     SN/ID               │
+    │     Integration     │           │     Notes               │
+    │     Entity ID(s)    │           └─────────────────────────┘
+    └─────────────────────┘
 
----
+Changes and deletions flow from HA outward. Claude Code validates HA against the TSV,
+produces a diff table, and the owner updates the TSV before pushing to the Sheet.
 
-## Device Inventory
+    Home Assistant       Claude Code              TSV / Sheet
+    (most fields)   ──►  validate HA vs TSV  ──►  open in VS Code
+                         produce diff table       edit Model, SN, Notes
+                                             ──►  Ctrl+A → paste special
+                                                  (values only) → Sheet
 
-**Complete device inventory available in Google Sheet:**
-
-**[House IT Inventory & Documentation](https://docs.google.com/spreadsheets/d/1w4-gFy8rL0OqKrlzC7T9p2vFs5JBJYV2dyVfrrOA8DI)**  
+**[House IT Inventory & Documentation](https://docs.google.com/spreadsheets/d/1w4-gFy8rL0OqKrlzC7T9p2vFs5JBJYV2dyVfrrOA8DI)**
 Google Account: westcombecasslake@gmail.com (transfers with house)
 
-The spreadsheet contains comprehensive details for all 74 devices including:
-- Physical location (room and specific placement)
-- Home Assistant entity IDs
-- Device type and model numbers
-- Serial numbers and firmware versions
-- Integration type (Insteon, YoLink, Ecobee, Physical)
-- Function and purpose
-- Installation dates (smoke/CO detectors: February 2024)
-- Special notes and cross-references
+The Sheet includes:
+- A device list tab with all columns above
+- A pivot table tab showing device counts by subsystem and integration
 
-**Device Count Summary:**
-- **Insteon Devices:** 39 (lighting, sensors, infrastructure)
-- **YoLink Devices:** 27 (smoke/CO, temperature, humidity, power monitoring)
-- **Matter/Thread Devices:** 4 (air quality sensors, bathroom fan switches)
-- **Ring Devices:** 1 (Video Doorbell 2)
-- **Ecobee:** 1 (smart thermostat with remote sensor)
-- **Physical Sensors:** 2 (sump depth bobber, powerline monitor)
-- **Total:** 74 devices
+For any count or detail question, consult the Sheet or TSV — do not rely on counts in
+this document.
 
 ---
 
-## Device Categories
+## Reconciliation Process
 
-### Lighting Control
-- **Indoor Lighting:** 25 devices
-- **Premise/Outdoor Lighting:** 12 devices
-- **Seasonal Lights:** 7 devices
+After installation activity, device changes, or deletions, HA is the system of record
+for most fields. Reconcile using Claude Code to validate HA against the TSV, then push
+the result to the Sheet.
 
-### Safety & Monitoring
-- **Smoke/CO Detectors:** 8 YoLink sensors (installed 2/2024)
-- **Leak Sensors:** 3 YoLink sensors + 1 YoLink siren
-- **Sump Pump Monitoring:** 3 sensors (depth, power, leak)
+### Steps
 
-### HVAC & Environmental
-- **Ecobee Thermostat:** 1 main floor controller
-- **Humidity Control:** 5 YoLink sensors (basement, laundry, master bath, middle bath, east bath)
-- **Temperature Monitoring:** 6 YoLink sensors (appliances + rooms)
+1. **Validate HA against TSV**
+   In Claude Code, run:
+   > "Ask: validate HA device registry against TSV"
 
-### Utilities
-- **Irrigation:** 1 drip sprinkler control
-- **Laundry:** 1 dryer power monitor
-- **Garage:** 3 devices (lights, motion, noise filter)
+   Claude Code will compare HA's device registry to `device-inventory.tsv` and produce
+   a diff table showing fields that differ for HA-owned fields, devices in HA missing
+   from TSV, and devices in TSV missing from HA (separated — these are different cases).
+   SN and Location Detail differences are expected and will not be flagged.
 
-### System Infrastructure
-- **Insteon PLM:** 2413U (Powerline Modem)
-- **YoLink Hub:** YS1604-UC with speaker
+2. **Review and resolve**
+   Decide whether each discrepancy requires a TSV update or investigation.
+
+3. **Update the TSV**
+   Open `device-inventory.tsv` in VS Code. Edit TSV-owned fields (Model, SN/ID, Notes)
+   as needed. Ctrl+A, Copy.
+
+4. **Push to Sheet**
+   Open the Sheet → device list tab → select all → Paste Special → Values Only.
+
+5. **Commit**
+   Commit the updated TSV alongside any YAML changes that prompted the reconciliation.
 
 ---
 
-## Notes
+## Stable Notes
 
 - All Insteon PS01 switches are at firmware v.54
 - YoLink smoke/CO sensors installed February 2024
-- Sump pump uses physical float sensor connected to Insteon 2450
-- Custom dusk sensor using Amazon lamp post sensor + Insteon micro module
-- Powerline noise filter in garage isolates camper battery charger
+- Sump pump uses physical float sensor (Letzgo SB2) connected to Insteon 2450 relay
+- Custom dusk sensor: Amazon lamp post sensor driving Insteon micro module (2443-222)
+- Powerline noise filters (Insteon 1626-10) in garage and living room isolate high-interference loads
+- Ecobee thermostat is controlled exclusively through the Ecobee app and HomeKit -- HA only controls the fan via device_id
