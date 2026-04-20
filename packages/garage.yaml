@@ -124,7 +124,7 @@ automation:
       - platform: state
         entity_id:
           - binary_sensor.garage_motion
-          - binary_sensor.back_yard_garage
+          - binary_sensor.back_yard_garage_door
           - binary_sensor.entry_door_garage
         to: "on"
     action:
