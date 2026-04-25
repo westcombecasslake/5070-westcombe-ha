@@ -6,7 +6,6 @@
 # Features:
 # - 7-day and 14-day rolling averages to filter HVAC cycles
 # - Baseline tracking (good pad performance level)
-# - Automatic pad change detection via humidity spike
 # - Declining trend early warning
 # - Below-baseline degradation alerts
 #
@@ -22,7 +21,8 @@
 # Notes:
 # - Statistics sensors need 7 days to populate after first setup
 # - Baseline set to 44% based on Jan 25, 2026 good pad performance
-# - Auto-detection triggers on humidity spike >50% for 30+ minutes
+# - All alerts gated on HVAC heat mode to prevent spring/fall false triggers
+# - Pad change date and baseline must be updated manually via UI after swap
 ################################################################################
 
 input_number:
@@ -81,6 +81,10 @@ automation:
         below: 36
         for:
           hours: 48
+    condition:
+      - condition: state
+        entity_id: climate.main_floor
+        state: "heat"
     action:
       - service: notify.house_alerts
         data:
@@ -107,6 +111,10 @@ automation:
           {{ current < (baseline - 8) and current < 40 }}
         for:
           days: 3
+    condition:
+      - condition: state
+        entity_id: climate.main_floor
+        state: "heat"
     action:
       - service: notify.house_alerts
         data:
@@ -131,6 +139,9 @@ automation:
         for:
           days: 5
     condition:
+      - condition: state
+        entity_id: climate.main_floor
+        state: "heat"
       - condition: numeric_state
         entity_id: sensor.main_floor_humidity_7_day_average
         below: 40
@@ -143,41 +154,3 @@ automation:
             7-day average: {{ states('sensor.main_floor_humidity_7_day_average') }}%
 
             Watch for continued decline - may need pad change soon
-
-  - id: humidifier_pad_change_detected
-    alias: Humidifier Pad Change Detected
-    description: Auto-detect pad change via humidity spike and update baseline
-    mode: single
-    trigger:
-      - platform: numeric_state
-        entity_id: sensor.main_floor_current_humidity
-        above: 50
-        for:
-          minutes: 30
-    condition:
-      # Only fire when HVAC is in heat mode — prevents false triggers
-      # from summer humidity on days when the humidifier isn't running
-      - condition: state
-        entity_id: climate.main_floor
-        state: "heat"
-    action:
-      - service: input_datetime.set_datetime
-        target:
-          entity_id: input_datetime.last_humidifier_pad_change
-        data:
-          datetime: "{{ now() }}"
-      - delay:
-          hours: 24
-      - service: input_number.set_value
-        target:
-          entity_id: input_number.humidifier_baseline
-        data:
-          value: "{{ states('sensor.main_floor_humidity_7_day_average') | float }}"
-      - service: notify.operational_log
-        data:
-          title: "✓ Humidifier Pad Change Detected"
-          message: |
-            Humidity spike detected - pad change logged
-
-            Date: {{ now().strftime('%B %d, %Y at %I:%M %p') }}
-            New baseline: {{ states('sensor.main_floor_humidity_7_day_average') }}%
