@@ -1,47 +1,52 @@
 ###############################################################################
 # AIR QUALITY MONITORING & CONTROL
-###############################################################################
 #
-# PURPOSE:
 # Comprehensive air quality management using IKEA Alpstuga sensors to monitor
 # CO2 and PM2.5 levels across two floors. Coordinates HVAC filtration and
 # exhaust ventilation to maintain healthy indoor air quality.
 #
+# ARCHITECTURE:
+# Two independent control loops share the HVAC fan resource:
+#   1. PM2.5 loop — runs HVAC fan in continuous ON mode for filtration
+#   2. CO2 loop — runs exhaust fans to flush stale air via ventilation
+#
+# PM2.5 takes strict priority. The CO2 automations check
+# input_boolean.pm25_filtration_active before acting, and any automation
+# that returns the HVAC fan to AUTO must also check this flag.
+#
 # FEATURES:
-# * PM2.5 filtration takes priority over all other HVAC fan automation
-# * CO2 managed via exhaust ventilation when PM2.5 levels allow
-# * Daily air quality summaries with trend comparison
-# * Sensor offline detection
-# * Four-tier Pushover notification system
+#   - PM2.5 filtration takes priority over all other HVAC fan automation
+#   - CO2 managed via exhaust ventilation when PM2.5 levels allow
+#   - Daily air quality summaries with 7-day trend comparison
+#   - Sensor offline detection with recovery notification
+#   - Four-tier Pushover notification system (emergency / alert / notice / log)
 #
 # HARDWARE:
-# * 2x IKEA Alpstuga sensors (CO2, PM2.5)
-#   - Floor 1: Living area (sensor.living_area_co2, sensor.living_area_pm25)
-#   - Floor 2: Master bedroom (sensor.master_bedroom_co2, sensor.master_bedroom_pm25)
-# * HVAC fan with HEPA 13 + carbon filter (climate.main_floor via script)
-# * Exhaust fans: bathroom, laundry, kitchen hood
+#   - 2x IKEA Alpstuga sensors (CO2, PM2.5)
+#       Floor 1: Living area   (sensor.living_area_co2, sensor.living_area_pm25)
+#       Floor 2: Master bedroom (sensor.master_bedroom_co2, sensor.master_bedroom_pm25)
+#   - HVAC fan with HEPA 13 + carbon filter (climate.main_floor via script)
+#   - Exhaust fans: bathroom, laundry, kitchen hood
 #
-# THRESHOLDS (EPA/WHO Guidelines):
-# PM2.5 (μg/m³):
-#   - Good: 0-12
-#   - Moderate: 12-35
-#   - Unhealthy for sensitive: 35-55
-#   - Unhealthy: 55-150
-#   - Very unhealthy: 150-250
-#   - Hazardous: 250+
+# THRESHOLDS — PM2.5 μg/m³ (EPA/WHO):
+#   Good:                    0–12
+#   Moderate:               12–35
+#   Unhealthy for sensitive: 35–55
+#   Unhealthy:              55–150
+#   Very unhealthy:        150–250
+#   Hazardous:              250+
 #
-# CO2 (ppm):
-#   - Excellent: <800
-#   - Good: 800-1000
-#   - Acceptable: 1000-1500
-#   - Poor: 1500-2000
-#   - Very poor: >2000
+# THRESHOLDS — CO2 ppm:
+#   Excellent:    <800
+#   Good:       800–1000
+#   Acceptable: 1000–1500
+#   Poor:       1500–2000
+#   Very poor:   >2000
 #
-# INTEGRATION PRIORITY:
-# PM2.5 filtration overrides bathroom/laundry fan automations.
-# Other automations should check input_boolean.pm25_filtration_active
-# before returning HVAC fan to AUTO mode.
-#
+# INTEGRATION NOTE:
+# Any automation outside this package that controls the HVAC fan must check
+# input_boolean.pm25_filtration_active before returning it to AUTO mode.
+# PM2.5 filtration overrides bathroom and laundry fan automations.
 ###############################################################################
 
 # ==================================================
@@ -59,7 +64,9 @@ input_text:
     initial: "Normal"
 
 input_number:
-  # Daily statistics tracking
+  # --------------------------------------------------
+  # Daily maximums — reset at 11:55 PM by daily summary
+  # --------------------------------------------------
   living_area_co2_max_today:
     name: Living Area CO2 Max Today
     min: 0
@@ -92,6 +99,9 @@ input_number:
     unit_of_measurement: "μg/m³"
     icon: mdi:air-filter
 
+  # --------------------------------------------------
+  # PM2.5 filtration session tracking
+  # --------------------------------------------------
   pm25_filter_events_today:
     name: PM2.5 Filter Events Today
     min: 0
@@ -106,16 +116,18 @@ input_number:
     step: 1
     mode: box
 
-  # Runtime tracking
   pm25_filtration_runtime_today:
     name: PM2.5 Filtration Runtime Today
     min: 0
-    max: 1440  # Max 24 hours in minutes
+    max: 1440
     step: 1
     unit_of_measurement: "min"
     icon: mdi:timer
 
-  # 7-day averages for trend comparison
+  # --------------------------------------------------
+  # 7-day rolling averages — updated nightly by daily summary
+  # Used for trend comparison in the summary report
+  # --------------------------------------------------
   pm25_filter_events_7day_avg:
     name: PM2.5 Filter Events 7-Day Average
     min: 0
@@ -157,21 +169,39 @@ input_number:
 
 # ==================================================
 # PM2.5 Management (HIGHEST PRIORITY)
+#
+# Three automations manage the full PM2.5 filtration lifecycle:
+#   Elevated      — detects threshold breach, activates HVAC fan, notifies
+#   Filter Continue — polling guard that keeps fan on while PM2.5 stays high
+#   Normal        — detects recovery, deactivates flag, returns fan to AUTO
+#   Safety Timeout — hard 4-hour limit in case sensor gets stuck elevated
+#
+# Notification severity scales with measured level:
+#   >150 μg/m³  → house_alerts  (emergency)
+#    >55 μg/m³  → house_alerts  (alert)
+#    >35 μg/m³  → house_notices (standard)
 # ==================================================
 
 automation:
   # --------------------------------------------------
   # PM2.5 — Elevated Detection
   #
-  # Triggers HVAC filtration for unhealthy PM2.5 levels.
-  # This takes priority over all other HVAC fan automation.
+  # Watches both sensors. Triggers after 3 minutes above
+  # 35 μg/m³ (unhealthy for sensitive groups) to filter
+  # brief spikes from cooking or other transient events.
+  #
+  # On trigger:
+  #   - Sets pm25_filtration_active flag (blocks CO2 ventilation)
+  #   - Records start timestamp for runtime calculation
+  #   - Switches HVAC fan from AUTO to continuous ON
+  #   - Sends severity-appropriate notification
   # --------------------------------------------------
   - id: air_quality_pm25_elevated
     alias: "Air Quality - PM2.5 Elevated"
     trigger:
       - platform: numeric_state
         entity_id: sensor.living_area_pm25
-        above: 35  # Unhealthy for sensitive groups
+        above: 35
         for: "00:03:00"
       - platform: numeric_state
         entity_id: sensor.master_bedroom_pm25
@@ -182,12 +212,10 @@ automation:
         entity_id: input_boolean.pm25_filtration_active
         state: "off"
     action:
-      # Activate filtration mode
       - service: input_boolean.turn_on
         target:
           entity_id: input_boolean.pm25_filtration_active
 
-      # Update status helper
       - service: input_text.set_value
         target:
           entity_id: input_text.pm25_status
@@ -195,30 +223,27 @@ automation:
           value: >
             Active - {{ [states('sensor.living_area_pm25')|float(0), states('sensor.master_bedroom_pm25')|float(0)] | max | round(1) }} μg/m³
 
-      # Store start time
+      # Record start time for runtime accounting in Normal and Safety Timeout
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filtration_start_time
         data:
           value: "{{ as_timestamp(now()) }}"
 
-      # Increment event counter
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filter_events_today
         data:
           value: "{{ states('input_number.pm25_filter_events_today') | int(0) + 1 }}"
 
-      # Turn on HVAC fan for filtration
       - service: climate.set_fan_mode
         target:
           device_id: c38113c2d02da790b689d4a3bdc4b5e1
         data:
           fan_mode: "on"
 
-      # Notify - severity based on level
+      # Scale notification to worst measured level across both sensors
       - choose:
-          # Very Unhealthy (150+) - Emergency alert
           - conditions:
               - condition: or
                 conditions:
@@ -243,7 +268,6 @@ automation:
                     3. Stay indoors
                     4. Check air quality source
 
-          # Unhealthy (55-150) - High priority
           - conditions:
               - condition: or
                 conditions:
@@ -265,7 +289,6 @@ automation:
                     HVAC filter activated
                     Avoid outdoor air intake
         default:
-          # Moderate (35-55) - Standard notice
           - service: notify.house_notices
             data:
               title: "💨 Air Quality Alert"
@@ -281,8 +304,13 @@ automation:
   # --------------------------------------------------
   # PM2.5 — Filtration Continuation
   #
-  # Keeps HVAC fan running while PM2.5 remains elevated.
-  # Runs every 10 minutes to ensure fan stays on.
+  # Polling guard that runs every 10 minutes while
+  # pm25_filtration_active is on. Re-asserts the HVAC fan
+  # ON command in case another automation or manual action
+  # returned it to AUTO while filtration is still needed.
+  #
+  # Condition: either sensor still above 12 μg/m³ (Good threshold).
+  # If both sensors are below 12, Normal handles the shutdown.
   # --------------------------------------------------
   - id: air_quality_pm25_filter_continue
     alias: "Air Quality - PM2.5 Filter Continue"
@@ -297,12 +325,11 @@ automation:
         conditions:
           - condition: numeric_state
             entity_id: sensor.living_area_pm25
-            above: 12  # Good air quality threshold
+            above: 12
           - condition: numeric_state
             entity_id: sensor.master_bedroom_pm25
             above: 12
     action:
-      # Keep HVAC fan running
       - service: climate.set_fan_mode
         target:
           device_id: c38113c2d02da790b689d4a3bdc4b5e1
@@ -312,8 +339,17 @@ automation:
   # --------------------------------------------------
   # PM2.5 — Return to Normal
   #
-  # Deactivates filtration when both sensors show good air quality.
-  # Returns HVAC fan to AUTO mode.
+  # Polls every 10 minutes. Shuts down filtration when
+  # both sensors report Good air quality (<12 μg/m³) and
+  # at least 15 minutes of filtration have elapsed.
+  #
+  # The 15-minute minimum prevents premature shutdown
+  # from a brief sensor dip before air is fully cleared.
+  #
+  # On recovery:
+  #   - Calculates and logs actual runtime
+  #   - Clears pm25_filtration_active flag
+  #   - Returns HVAC fan to AUTO
   # --------------------------------------------------
   - id: air_quality_pm25_normal
     alias: "Air Quality - PM2.5 Normal"
@@ -326,45 +362,38 @@ automation:
         state: "on"
       - condition: numeric_state
         entity_id: sensor.living_area_pm25
-        below: 12  # Good air quality
+        below: 12
       - condition: numeric_state
         entity_id: sensor.master_bedroom_pm25
         below: 12
-      # Must have been filtering for at least 15 minutes
       - condition: template
         value_template: "{{ (as_timestamp(now()) - states('input_number.pm25_filtration_start_time')|float(0)) > 900 }}"
     action:
-      # Calculate and store runtime
       - variables:
           runtime_minutes: "{{ ((as_timestamp(now()) - states('input_number.pm25_filtration_start_time')|float(0)) / 60) | round(0) }}"
 
-      # Add runtime to today's total
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filtration_runtime_today
         data:
           value: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) + runtime_minutes|int(0) }}"
 
-      # Deactivate filtration mode
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.pm25_filtration_active
 
-      # Clear status helper
       - service: input_text.set_value
         target:
           entity_id: input_text.pm25_status
         data:
           value: "Normal"
 
-      # Return HVAC fan to auto
       - service: climate.set_fan_mode
         target:
           device_id: c38113c2d02da790b689d4a3bdc4b5e1
         data:
           fan_mode: "auto"
 
-      # Notify
       - service: notify.operational_log
         data:
           title: "✅ Air Quality Normal"
@@ -378,9 +407,12 @@ automation:
   # --------------------------------------------------
   # PM2.5 — Safety Timeout
   #
-  # Returns to AUTO after 4 hours of continuous filtration
-  # to prevent excessive HVAC runtime if sensor stuck.
-  # Logs actual elapsed runtime rather than hardcoded value.
+  # Hard 4-hour limit on continuous filtration. Fires if
+  # Normal never triggers, which would indicate a stuck
+  # sensor reporting permanently elevated PM2.5.
+  #
+  # Logs actual elapsed runtime rather than assuming 4 hours,
+  # since HA may have restarted during the filtration window.
   # --------------------------------------------------
   - id: air_quality_pm25_safety_timeout
     alias: "Air Quality - PM2.5 Safety Timeout"
@@ -390,37 +422,32 @@ automation:
         to: "on"
         for: "04:00:00"
     action:
-      # Calculate actual elapsed runtime
+      # Calculate actual elapsed time rather than assuming 4 hours
       - variables:
           runtime_minutes: "{{ ((as_timestamp(now()) - states('input_number.pm25_filtration_start_time')|float(0)) / 60) | round(0) }}"
 
-      # Add actual runtime to today's total
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filtration_runtime_today
         data:
           value: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) + runtime_minutes|int(0) }}"
 
-      # Deactivate
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.pm25_filtration_active
 
-      # Clear status helper
       - service: input_text.set_value
         target:
           entity_id: input_text.pm25_status
         data:
           value: "Normal"
 
-      # Return to auto
       - service: climate.set_fan_mode
         target:
           device_id: c38113c2d02da790b689d4a3bdc4b5e1
         data:
           fan_mode: "auto"
 
-      # Alert about timeout
       - service: notify.house_notices
         data:
           title: "⚠️ PM2.5 Filtration Timeout"
@@ -435,12 +462,26 @@ automation:
 
 # ==================================================
 # CO2 Management
+#
+# CO2 is controlled via exhaust ventilation rather than
+# filtration — the HEPA/carbon filter does not scrub CO2.
+# These automations run exhaust fans to flush stale air
+# and notify the resident to open windows if needed.
+#
+# All CO2 automations are gated on pm25_filtration_active
+# being off. Running exhaust fans during PM2.5 filtration
+# would draw unfiltered outdoor air into the house.
 # ==================================================
 
   # --------------------------------------------------
   # CO2 — Critical Level (Emergency)
   #
-  # Immediate alert for dangerous CO2 levels.
+  # Immediate alert when either sensor exceeds 2000 ppm
+  # (Very Poor — potential cognitive impairment).
+  # Sustained for 5 minutes to filter brief sensor spikes.
+  #
+  # No ventilation action taken at this level — resident
+  # must manually open windows. Alert directs them to act.
   # --------------------------------------------------
   - id: air_quality_co2_critical
     alias: "Air Quality - CO2 Critical"
@@ -466,11 +507,15 @@ automation:
             Consider evacuating room
 
   # --------------------------------------------------
-  # CO2 — High Level Living Area (Ventilation Needed)
+  # CO2 — High Level Living Area
   #
-  # Runs HVAC exhaust boost and notifies to open windows.
-  # Severity-based guidance tells resident how much to open.
-  # Only when PM2.5 filtration is NOT active.
+  # Triggers at 1000 ppm (Acceptable/Poor boundary) sustained
+  # for 5 minutes. Runs HVAC exhaust boost script and notifies
+  # resident with severity-based window guidance.
+  #
+  # Gated on pm25_filtration_active being off — exhaust fans
+  # draw outdoor air in, which is counterproductive during
+  # PM2.5 filtration events.
   # --------------------------------------------------
   - id: air_quality_co2_high_living_area
     alias: "Air Quality - CO2 High Living Area"
@@ -499,6 +544,15 @@ automation:
 
   # --------------------------------------------------
   # CO2 — High Level Master Bedroom
+  #
+  # Same threshold as living area (1000 ppm, 5 minutes)
+  # but restricted to nighttime hours (9 PM–7 AM) when
+  # the bedroom is occupied. Daytime CO2 rise in an
+  # unoccupied bedroom is not actionable.
+  #
+  # Uses master bath fan rather than HVAC exhaust boost —
+  # direct extraction from the bedroom zone is more
+  # effective for overnight CO2 accumulation.
   # --------------------------------------------------
   - id: air_quality_co2_high_master_bedroom
     alias: "Air Quality - CO2 High Master Bedroom"
@@ -508,28 +562,26 @@ automation:
         above: 1000
         for: "00:05:00"
     condition:
-      # Only during nighttime (bedroom occupied)
+      # Only act during occupied hours
       - condition: time
         after: "21:00:00"
         before: "07:00:00"
-      # Don't run during PM2.5 filtration
+      # Exhaust during PM2.5 filtration draws in unfiltered outdoor air
       - condition: state
         entity_id: input_boolean.pm25_filtration_active
         state: "off"
     action:
-      # Run bathroom fan for bedroom ventilation
       - service: light.turn_on
         target:
           entity_id: light.master_bath_fan
 
-      # Auto-off after 20 minutes
+      # Fixed 20-minute runtime — no return-to-normal polling for this zone
       - delay: "00:20:00"
 
       - service: light.turn_off
         target:
           entity_id: light.master_bath_fan
 
-      # Notify
       - service: notify.house_notices
         data:
           title: "🪟 Bedroom CO2 High"
@@ -542,13 +594,22 @@ automation:
 
 # ==================================================
 # Daily Statistics & Reporting
+#
+# Two automations handle statistics:
+#   Update Daily Max — polls every 5 minutes, tracks
+#     the highest reading seen today for each sensor.
+#   Daily Summary — fires at 11:55 PM, sends a formatted
+#     report comparing today's peaks to 7-day averages,
+#     updates rolling averages, and resets daily counters.
 # ==================================================
 
   # --------------------------------------------------
   # Daily Stats — Update Max Values
   #
-  # Tracks daily maximum readings for summary report.
-  # Runs every 5 minutes.
+  # Polls every 5 minutes and updates each sensor's daily
+  # max if the current reading exceeds the stored value.
+  # Uses choose/condition rather than max() template to
+  # avoid overwriting a valid peak with a sensor dropout.
   # --------------------------------------------------
   - id: air_quality_update_daily_max
     alias: "Air Quality - Update Daily Max"
@@ -556,7 +617,6 @@ automation:
       - platform: time_pattern
         minutes: "/5"
     action:
-      # Living Area CO2
       - choose:
           - conditions:
               - condition: template
@@ -568,7 +628,6 @@ automation:
                 data:
                   value: "{{ states('sensor.living_area_co2')|float(0) }}"
 
-      # Living Area PM2.5
       - choose:
           - conditions:
               - condition: template
@@ -580,7 +639,6 @@ automation:
                 data:
                   value: "{{ states('sensor.living_area_pm25')|float(0) }}"
 
-      # Master Bedroom CO2
       - choose:
           - conditions:
               - condition: template
@@ -592,7 +650,6 @@ automation:
                 data:
                   value: "{{ states('sensor.master_bedroom_co2')|float(0) }}"
 
-      # Master Bedroom PM2.5
       - choose:
           - conditions:
               - condition: template
@@ -606,6 +663,16 @@ automation:
 
   # --------------------------------------------------
   # Daily Summary Report — 11:55 PM
+  #
+  # Compares today's peak readings to 7-day rolling averages
+  # and sends a formatted summary via operational_log.
+  # Trend arrows show whether today was better or worse
+  # than the rolling average by a meaningful margin.
+  #
+  # After sending the report:
+  #   1. Updates all 7-day averages with today's values
+  #      using weighted average: ((avg * 6) + today) / 7
+  #   2. Resets all daily counters to zero
   # --------------------------------------------------
   - id: air_quality_daily_summary
     alias: "Air Quality - Daily Summary"
@@ -613,77 +680,70 @@ automation:
       - platform: time
         at: "23:55:00"
     action:
-      # Calculate variables for summary
       - variables:
-          # Floor 1 values
           floor1_co2: "{{ states('input_number.living_area_co2_max_today')|float(0) }}"
           floor1_pm25: "{{ states('input_number.living_area_pm25_max_today')|float(0) }}"
           floor1_co2_avg: "{{ states('input_number.living_area_co2_7day_avg')|float(0) }}"
           floor1_pm25_avg: "{{ states('input_number.living_area_pm25_7day_avg')|float(0) }}"
-          
-          # Floor 2 values
+
           floor2_co2: "{{ states('input_number.master_bedroom_co2_max_today')|float(0) }}"
           floor2_pm25: "{{ states('input_number.master_bedroom_pm25_max_today')|float(0) }}"
           floor2_co2_avg: "{{ states('input_number.master_bedroom_co2_7day_avg')|float(0) }}"
           floor2_pm25_avg: "{{ states('input_number.master_bedroom_pm25_7day_avg')|float(0) }}"
-          
-          # Floor 1 emoji (worst of CO2 or PM2.5)
+
+          # Status emoji reflects the worst reading of the day (CO2 or PM2.5)
           floor1_emoji: >
             {% if floor1_co2 > 2000 or floor1_pm25 > 55 %}🔴
             {% elif floor1_co2 > 1200 or floor1_pm25 > 35 %}🟡
             {% else %}🟢{% endif %}
-          
-          # Floor 2 emoji (worst of CO2 or PM2.5)
+
           floor2_emoji: >
             {% if floor2_co2 > 2000 or floor2_pm25 > 55 %}🔴
             {% elif floor2_co2 > 1200 or floor2_pm25 > 35 %}🟡
             {% else %}🟢{% endif %}
-          
-          # Floor 1 CO2 trend
+
+          # CO2 trend: flag if >100 ppm above or below 7-day average
           floor1_co2_diff: "{{ (floor1_co2 - floor1_co2_avg)|round(0) }}"
           floor1_co2_trend: >
             {% set diff = floor1_co2 - floor1_co2_avg %}
             {% if diff > 100 %}↑ {{ diff|round(0) }} ppm vs avg
             {% elif diff < -100 %}↓ {{ (diff|abs)|round(0) }} ppm vs avg
             {% else %}→ stable{% endif %}
-          
-          # Floor 1 PM2.5 trend
+
+          # PM2.5 trend: flag if >10 μg/m³ above or below 7-day average
           floor1_pm25_diff: "{{ (floor1_pm25 - floor1_pm25_avg)|round(1) }}"
           floor1_pm25_trend: >
             {% set diff = floor1_pm25 - floor1_pm25_avg %}
             {% if diff > 10 %}↑ worse
             {% elif diff < -10 %}↓ better
             {% else %}→ stable{% endif %}
-          
-          # Floor 2 CO2 trend
+
           floor2_co2_diff: "{{ (floor2_co2 - floor2_co2_avg)|round(0) }}"
           floor2_co2_trend: >
             {% set diff = floor2_co2 - floor2_co2_avg %}
             {% if diff > 100 %}↑ {{ diff|round(0) }} ppm vs avg
             {% elif diff < -100 %}↓ {{ (diff|abs)|round(0) }} ppm vs avg
             {% else %}→ stable{% endif %}
-          
-          # Floor 2 PM2.5 trend
+
           floor2_pm25_diff: "{{ (floor2_pm25 - floor2_pm25_avg)|round(1) }}"
           floor2_pm25_trend: >
             {% set diff = floor2_pm25 - floor2_pm25_avg %}
             {% if diff > 10 %}↑ worse
             {% elif diff < -10 %}↓ better
             {% else %}→ stable{% endif %}
-          
-          # Filtration stats
+
           events_today: "{{ states('input_number.pm25_filter_events_today')|int(0) }}"
           runtime_today: "{{ states('input_number.pm25_filtration_runtime_today')|int(0) }}"
           events_7day_avg: "{{ states('input_number.pm25_filter_events_7day_avg')|float(0) }}"
-          
-          # Event trend calculation
+
+          # Filtration event trend: flag if >1.5 events above or below average
           event_diff: "{{ events_today|int(0) - events_7day_avg|float(0) }}"
           trend_text: >
             {% if event_diff|float > 1.5 %}+{{ event_diff|round(0) }} events vs 7-day avg (worse)
             {% elif event_diff|float < -1.5 %}{{ event_diff|round(0) }} events vs 7-day avg (better)
             {% else %}Same as 7-day avg{% endif %}
-          
-          # Status message (bottom line)
+
+          # Summary status line — surfaces the most actionable condition
           status_msg: >
             {% if floor1_emoji == '🔴' or floor2_emoji == '🔴' %}
             ⚠️ Poor air quality. {% if floor1_co2 > 2000 %}Living area CO2 critical. {% endif %}{% if floor2_co2 > 2000 %}Bedroom CO2 critical. {% endif %}{% if floor1_pm25 > 55 or floor2_pm25 > 55 %}Check HVAC filter and ventilation.{% endif %}
@@ -693,7 +753,6 @@ automation:
             ✓ {% if floor2_co2 > 1000 and floor2_co2 <= 1200 %}Bedroom CO2 elevated overnight (normal). {% else %}Excellent air quality all day{% endif %}
             {% endif %}
 
-      # Send summary notification
       - service: notify.operational_log
         data:
           title: "📊 Daily Air Quality"
@@ -708,7 +767,7 @@ automation:
             
             {{ status_msg }}
 
-      # Update all 7-day rolling averages
+      # Update 7-day rolling averages — weighted: ((avg * 6) + today) / 7
       - service: input_number.set_value
         target:
           entity_id: input_number.pm25_filter_events_7day_avg
@@ -739,7 +798,7 @@ automation:
         data:
           value: "{{ ((floor2_pm25_avg * 6) + floor2_pm25) / 7 }}"
 
-      # Reset daily counters
+      # Reset daily counters for the next day
       - service: input_number.set_value
         target:
           entity_id: input_number.living_area_co2_max_today
@@ -778,10 +837,19 @@ automation:
 
 # ==================================================
 # Sensor Monitoring
+#
+# Detects sensors going offline and logs recovery.
+# Offline detection has a 10-minute grace period to
+# avoid alerts from brief Zigbee dropouts or restarts.
 # ==================================================
 
   # --------------------------------------------------
   # Sensor Offline Detection
+  #
+  # Watches all four sensors. Triggers if any reports
+  # unavailable for 10 consecutive minutes. A single
+  # automation covers all sensors — trigger context
+  # provides the specific sensor name in the notification.
   # --------------------------------------------------
   - id: air_quality_sensor_offline_alert
     alias: "Air Quality - Sensor Offline Alert"
@@ -808,6 +876,10 @@ automation:
 
   # --------------------------------------------------
   # Sensor Recovery Notification
+  #
+  # Fires when a sensor returns from unavailable.
+  # 2-minute stability delay filters brief reconnects
+  # that drop out again immediately.
   # --------------------------------------------------
   - id: air_quality_sensor_recovery
     alias: "Air Quality - Sensor Recovery"

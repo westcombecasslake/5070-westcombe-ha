@@ -28,6 +28,8 @@
 # Notes:
 # - Monthly total in notification calculated inline to include current day
 # - All input_number helpers persist across restarts (no initial: values)
+# - input_datetime.sump_pump_last_cycle_time persists last real on transition
+#   (used instead of last_changed to avoid false resets from availability events)
 ################################################################################
 
 input_number:
@@ -46,6 +48,12 @@ input_number:
     step: 0.1
     unit_of_measurement: "gal"
     icon: mdi:counter
+
+input_datetime:
+  sump_pump_last_cycle_time:
+    name: Sump Pump Last Cycle Time
+    has_date: true
+    has_time: true
 
 sensor:
   - platform: history_stats
@@ -97,9 +105,9 @@ template:
       - name: "Sump Pump Hours Since Last Cycle"
         unit_of_measurement: "hrs"
         state: >
-          {% set last_changed = states.binary_sensor.sump_pump_running.last_changed %}
-          {% if last_changed %}
-            {{ ((now() - last_changed).total_seconds() / 3600) | round(1) }}
+          {% set last = states('input_datetime.sump_pump_last_cycle_time') %}
+          {% if last not in ['unknown', 'unavailable', ''] %}
+            {{ ((now() - as_local(as_datetime(last))).total_seconds() / 3600) | round(1) }}
           {% else %}
             0
           {% endif %}
@@ -119,6 +127,21 @@ template:
         icon: mdi:timer-sand
 
 automation:
+  - id: sump_pump_record_last_cycle
+    alias: Sump Pump Record Last Cycle Time
+    description: Stamp input_datetime on real on transitions only (excludes unavailable→on)
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.sump_pump_running
+        to: "on"
+        from: "off"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.sump_pump_last_cycle_time
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
   - id: sump_pump_daily_summary
     alias: Sump Pump Daily Summary
     description: Send daily pump activity summary at 11:55 PM. Monthly total calculated inline to include today.
@@ -183,6 +206,14 @@ automation:
       - condition: template
         value_template: >
           {{ states('sensor.rainfall_24_hours') | float(0) > 0.1 }}
+      - condition: template
+        value_template: >
+          {% set last_alert = state_attr('automation.sump_pump_failure_rain_alert', 'last_triggered') %}
+          {% if last_alert %}
+            {{ (now() - last_alert).total_seconds() > 14400 }}
+          {% else %}
+            true
+          {% endif %}
     action:
       - service: notify.house_alerts
         data:
@@ -251,6 +282,7 @@ automation:
       - platform: state
         entity_id: binary_sensor.sump_pump_running
         to: "on"
+        from: "off"
     condition:
       - condition: template
         value_template: >
