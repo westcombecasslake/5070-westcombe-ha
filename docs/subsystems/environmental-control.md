@@ -131,7 +131,7 @@ Automatically controls basement dehumidifier outlet to maintain 45-50% humidity 
 
 Automatically detects showers by monitoring humidity rise patterns and runs the exhaust fan to remove moisture, followed by turning on the HVAC fan to further equalize humidity throughout the house. Uses relative humidity tracking (baseline vs. peak) to work correctly regardless of seasonal outdoor humidity levels. Includes a comfort delay before the fan starts and a fixed runtime per HVAC guidelines. Includes manual timer for non-shower ventilation needs.
 
-**Rationale:** Prevents mold growth and moisture damage by removing shower humidity. Traditional fixed timers waste energy running fan when not needed, while humidity-based control responds only to actual moisture events. The relative rise method works year-round without seasonal adjustments. A flat 20-minute runtime is used based on observed sensor data showing the bulk of humidity removal occurs in the first few minutes; continuing beyond 20 minutes provides minimal additional benefit. The comfort delay prevents the fan from starting immediately, avoiding a sudden rush of cold air during showering. After the exhaust fan completes its cycle, the HVAC fan is activated to help distribute and equalize humidity throughout the house.
+**Rationale:** Prevents mold growth and moisture damage by removing shower humidity. Traditional fixed timers waste energy running fan when not needed, while humidity-based control responds only to actual moisture events. The relative rise method works year-round without seasonal adjustments. A flat 30-minute runtime is used based on observed sensor data and HVAC guidelines. The comfort delay prevents the fan from starting immediately, avoiding a sudden rush of cold air during showering. After the exhaust fan completes its cycle, the HVAC fan is activated to help distribute and equalize humidity throughout the house.
 
 This pattern is deployed as separate YAML packages per bathroom, each with its own helpers and entities to allow fully independent monitoring and control.
 
@@ -148,8 +148,8 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 - Fan turns on unconditionally after the delay — no re-check
 
 **Fan Running Phase:**
-- Fan runs for a flat 20 minutes per HVAC guidelines
-- After 20 minutes, fan turns off, all tracking values reset, and HVAC boost is triggered
+- Fan runs for a flat 30 minutes per HVAC guidelines
+- After 30 minutes, fan turns off, all tracking values reset, and HVAC boost is triggered
 - 2-hour safety timeout acts as a backstop in case the sequence is interrupted mid-run
 
 **Timeout Reset:**
@@ -157,7 +157,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 - Prevents stale baseline/peak from causing false triggers
 
 **Manual Timer:**
-- If fan is manually turned on (baseline is 0, meaning not automation-triggered), auto-off after 20 minutes
+- If fan is manually turned on (baseline is 0, meaning not automation-triggered), auto-off after 30 minutes
 - Independent of humidity-based control; useful for ventilation without showering
 
 **Startup Reset:**
@@ -186,7 +186,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 **Automations:**
 - `Master Bath Humidity - Shower Detection` — main polling loop
 - `Master Bath Humidity - Timeout` — stale value reset
-- `Master Bath Fan - Manual Timer` — 20-minute auto-off for manual use
+- `Master Bath Fan - Manual Timer` — 30-minute auto-off for manual use
 - `Master Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** masterbathhumidity.yaml
@@ -206,7 +206,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 **Automations:**
 - `Middle Bath Humidity - Shower Detection` — main polling loop
 - `Middle Bath Humidity - Timeout` — stale value reset
-- `Middle Bath Fan - Manual Timer` — 20-minute auto-off for manual use
+- `Middle Bath Fan - Manual Timer` — 30-minute auto-off for manual use
 - `Middle Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** middlebathhumidity.yaml
@@ -226,7 +226,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 **Automations:**
 - `East Bath Humidity - Shower Detection` — main polling loop
 - `East Bath Humidity - Timeout` — stale value reset
-- `East Bath Fan - Manual Timer` — 20-minute auto-off for manual use
+- `East Bath Fan - Manual Timer` — 30-minute auto-off for manual use
 - `East Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** eastbathhumidity.yaml
@@ -362,8 +362,8 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 - Slow climb that appears as a jump: rate-of-rise gate should have blocked this — check last_reading_age at time of trigger
 
 **Fan won't turn off after shower:**
-- Fan runs for a flat 20 minutes then stops automatically
-- If still running past 20 minutes, the sequence may have been interrupted — check automation trace
+- Fan runs for a flat 30 minutes then stops automatically
+- If still running past 30 minutes, the sequence may have been interrupted — check automation trace
 - 2-hour safety timeout will force off if sequence is stuck
 - Manual off always works regardless of automation state
 
