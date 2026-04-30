@@ -5,10 +5,10 @@
 #   - Relative rise detection, works year-round
 #   - Rate-of-rise gate filters ambient drift from shower events
 #   - 5-minute comfort delay before fan turns on
-#   - Flat 20-minute runtime per HVAC guidelines
+#   - Flat 30-minute runtime per HVAC guidelines
 #   - 2-hour safety timeout (backstop only)
 #   - Startup reset on HA restart
-#   - Manual fan 20-minute auto-off
+#   - Manual fan 30-minute auto-off
 #   - HVAC exhaust boost after cycle
 # ==================================================
 
@@ -108,7 +108,7 @@ automation:
 
           # --------------------------------------------------
           # Case 2: Full shower cycle
-          # Detect → comfort delay → fan on → 20-min run
+          # Detect → comfort delay → fan on → 30-min run
           # → fan off → reset → HVAC boost.
           #
           # Detection requires both:
@@ -151,8 +151,8 @@ automation:
                       - service: fan.turn_on
                         target:
                           entity_id: fan.middle_bath_humidity
-                      # Run for 20 minutes then shut down
-                      - delay: "00:20:00"
+                      # Run for 30 minutes then shut down
+                      - delay: "00:30:00"
                       - service: fan.turn_off
                         target:
                           entity_id: fan.middle_bath_humidity
@@ -226,7 +226,7 @@ automation:
         value_template: >
           {{ states('input_number.middle_bath_humidity_baseline') | float(0) == 0 }}
     action:
-      - delay: "00:20:00"
+      - delay: "00:30:00"
       - service: fan.turn_off
         target:
           entity_id: fan.middle_bath_humidity

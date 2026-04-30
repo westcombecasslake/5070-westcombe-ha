@@ -11,11 +11,11 @@
 # AUTOMATIONS:
 # 1. laundry_dryer_fan_control (Main) — mode: restart
 #    - Detects dryer ON (>200W) - Sets temperature baseline & turns fan ON
-#    - Detects dryer OFF (<2W) - Runs temp-based cooldown with 45-min timeout
-#    - Cooldown stops when temp drops to baseline+3F OR 45 minutes elapsed
+#    - Detects dryer OFF (<2W) - Runs temp-based cooldown with 20-min timeout
+#    - Cooldown stops when temp drops to baseline+3F OR 20 minutes elapsed
 #    - Triggers HVAC exhaust boost script when fan turns off
 #    - NOTE: mode:restart means a new dryer_off trigger during cooldown cancels
-#      and restarts cooldown with a fresh 45-minute deadline
+#      and restarts cooldown with a fresh 20-minute deadline
 #
 # 2. laundry_baseline_timeout (Maintenance) — mode: single
 #    - Resets temperature baseline to 0 after 4 hours of dryer inactivity
@@ -104,7 +104,7 @@ automation:
                   entity_id: light.laundry_fan_timer
 
           # --------------------------------------------------
-          # DRYER OFF - Temp-based cooldown with 45-min failsafe
+          # DRYER OFF - Temp-based cooldown with 20-min failsafe
           # --------------------------------------------------
           - conditions:
               - condition: trigger
@@ -117,9 +117,9 @@ automation:
                 data:
                   value: "{{ as_timestamp(now()) }}"
 
-              # Create a 45-minute deadline
+              # Create a 20-minute deadline
               - variables:
-                  cooldown_deadline: "{{ as_timestamp(now()) + (45 * 60) }}"
+                  cooldown_deadline: "{{ as_timestamp(now()) + (20 * 60) }}"
 
               # Repeat until temp drops to baseline + 3F OR deadline reached
               - repeat:
@@ -133,7 +133,7 @@ automation:
                             {% set baseline = states('input_number.laundry_temp_baseline') | float(0) %}
                             {{ current <= (baseline + 3) }}
 
-                        # Condition B: 45-minute timeout
+                        # Condition B: 20-minute timeout
                         # float without a default is intentional — if cooldown_deadline
                         # fails to resolve, the template errors visibly rather than
                         # silently defaulting to 0 and immediately exiting the loop.
@@ -159,11 +159,11 @@ automation:
   - id: laundry_baseline_timeout
     alias: "Laundry - Reset Baseline After 4 Hours"
     mode: single
-    
+
     trigger:
       - platform: time_pattern
         minutes: "/30"
-    
+
     condition:
       - condition: template
         value_template: >
@@ -171,7 +171,7 @@ automation:
           {% set last_off = states('input_number.laundry_dryer_last_off') | float(0) %}
           {% set age = as_timestamp(now()) - last_off %}
           {{ baseline > 0 and age > 14400 }}
-    
+
     action:
       - service: input_number.set_value
         target:
