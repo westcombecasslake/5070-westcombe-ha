@@ -11,8 +11,9 @@
 # AUTOMATIONS:
 # 1. laundry_dryer_fan_control (Main) — mode: restart
 #    - Detects dryer ON (>200W) - Sets temperature baseline & turns fan ON
-#    - Detects dryer OFF (<2W) - Runs temp-based cooldown with 20-min timeout
-#    - Cooldown stops when temp drops to baseline+3F OR 20 minutes elapsed
+#    - Detects dryer OFF (<2W) - Waits for temp to drop to baseline+3F
+#    - 20-minute timeout acts as failsafe if sensor goes quiet
+#    - 10-minute runout after threshold brings room closer to baseline
 #    - Triggers HVAC exhaust boost script when fan turns off
 #    - NOTE: mode:restart means a new dryer_off trigger during cooldown cancels
 #      and restarts cooldown with a fresh 20-minute deadline
@@ -24,14 +25,14 @@
 #
 # REQUIRED ENTITIES (not in this package):
 # - sensor.dryer_monitor_current_power (power monitoring sensor)
-# - sensor.laundry_temperature (room temperature sensor)
-# - light.laundry_fan_timer (fan switch/relay)
+# - sensor.laundry_temperature (Inovelli switch temp sensor)
+# - switch.laundry_fan_timer (fan switch/relay)
 # - script.hvac_exhaust_boost (HVAC boost script in scripts.yaml)
 #
 # BASELINE LOGIC:
 # - Baseline updates when dryer turns ON if:
-#   - Current temp < stored baseline (room has cooled), OR
-#   - Baseline = 0 (uninitialized), OR
+#   - Current temp < stored baseline (room cooled down), OR
+#   - Baseline is 0 (uninitialized), OR
 #   - Dryer off for 4+ hours (14400 seconds)
 #
 ###############################################################################
@@ -89,8 +90,8 @@ automation:
               - if:
                   - condition: template
                     value_template: >
-                      {{ stored_baseline == 0 or 
-                         current_temp < stored_baseline or 
+                      {{ stored_baseline == 0 or
+                         current_temp < stored_baseline or
                          time_since_off > 14400 }}
                 then:
                   - service: input_number.set_value
@@ -99,12 +100,13 @@ automation:
                     data:
                       value: "{{ current_temp }}"
 
-              - service: light.turn_on
+              - service: switch.turn_on
                 target:
-                  entity_id: light.laundry_fan_timer
+                  entity_id: switch.laundry_fan_timer
 
           # --------------------------------------------------
-          # DRYER OFF - Temp-based cooldown with 20-min failsafe
+          # DRYER OFF - Wait for cooldown with 20-min failsafe
+          # then 10-min runout to bring room closer to baseline
           # --------------------------------------------------
           - conditions:
               - condition: trigger
@@ -117,36 +119,26 @@ automation:
                 data:
                   value: "{{ as_timestamp(now()) }}"
 
-              # Create a 20-minute deadline
-              - variables:
-                  cooldown_deadline: "{{ as_timestamp(now()) + (20 * 60) }}"
+              # Wait for temp to drop to baseline + 3F
+              # Inovelli sensor fires state change events on temp change — no polling needed
+              # continue_on_timeout: true ensures fan turns off even if sensor goes quiet
+              - wait_for_trigger:
+                  - platform: template
+                    value_template: >
+                      {% set current = states('sensor.laundry_temperature') | float(0) %}
+                      {% set baseline = states('input_number.laundry_temp_baseline') | float(0) %}
+                      {{ current <= (baseline + 3) }}
+                timeout: "00:20:00"
+                continue_on_timeout: true
 
-              # Repeat until temp drops to baseline + 3F OR deadline reached
-              - repeat:
-                  until:
-                    - condition: or
-                      conditions:
-                        # Condition A: Temp within 3F of baseline
-                        - condition: template
-                          value_template: >
-                            {% set current = states('sensor.laundry_temperature') | float(0) %}
-                            {% set baseline = states('input_number.laundry_temp_baseline') | float(0) %}
-                            {{ current <= (baseline + 3) }}
-
-                        # Condition B: 20-minute timeout
-                        # float without a default is intentional — if cooldown_deadline
-                        # fails to resolve, the template errors visibly rather than
-                        # silently defaulting to 0 and immediately exiting the loop.
-                        - condition: template
-                          value_template: "{{ as_timestamp(now()) >= cooldown_deadline | float }}"
-
-                  sequence:
-                    - delay: "00:02:00"
+              # Runout — continue fan for 10 minutes after threshold met
+              # brings room closer to baseline before HVAC boost takes over
+              - delay: "00:10:00"
 
               # Cooldown complete - turn fan OFF
-              - service: light.turn_off
+              - service: switch.turn_off
                 target:
-                  entity_id: light.laundry_fan_timer
+                  entity_id: switch.laundry_fan_timer
 
               # Trigger HVAC exhaust boost
               - service: script.hvac_exhaust_boost

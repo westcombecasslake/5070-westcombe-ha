@@ -21,12 +21,14 @@
 # - Allowed: All other times including full weekends
 #
 # NOTIFICATIONS:
-# - Operational log on turn-on (humidity exceeded 50%, outside peak hours)
-# - Operational log on turn-off (humidity dropped below 45%)
+# - Notifies immediately when humidity crosses above 50% (regardless of peak hours)
+# - Notifies immediately when humidity crosses below 45% (regardless of switch state)
+# - Notifications are decoupled from switch control — peak hour suppression is silent
+# - Sensor bounce cannot cause repeat notifications (numeric_state trigger only
+#   fires once per threshold crossing — requires round-trip before re-triggering)
 # - No notification for peak hour shutoff (3 PM Mon-Fri)
 #
 ###############################################################################
-
 automation:
   - id: basement_dehumidifier_on
     alias: "Basement Dehumidifier - Turn On"
@@ -34,8 +36,6 @@ automation:
       - platform: numeric_state
         entity_id: sensor.basement_humidity_sensor_humidity
         above: 50
-      - platform: homeassistant
-        event: start
     condition:
       - condition: state          # only act if switch is currently off
         entity_id: switch.scheduled_power_save
@@ -62,13 +62,6 @@ automation:
       - service: switch.turn_on
         target:
           entity_id: switch.scheduled_power_save
-      - service: notify.operational_log
-        data:
-          title: "Basement Dehumidifier - High Humidity"
-          message: |
-            Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
-            Threshold: 50% (ON)
-            Status: Dehumidifier activated
 
   - id: basement_dehumidifier_off
     alias: "Basement Dehumidifier - Turn Off"
@@ -105,8 +98,29 @@ automation:
       - service: switch.turn_off
         target:
           entity_id: switch.scheduled_power_save
-      - condition: trigger
-        id: humidity_trigger
+
+  - id: basement_dehumidifier_notify_on
+    alias: "Basement Dehumidifier - Notify High Humidity"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.basement_humidity_sensor_humidity
+        above: 50
+    action:
+      - service: notify.operational_log
+        data:
+          title: "Basement Dehumidifier - High Humidity"
+          message: |
+            Current Humidity: {{ states('sensor.basement_humidity_sensor_humidity') }}%
+            Threshold: 50% (ON)
+            Status: Dehumidifier activated
+
+  - id: basement_dehumidifier_notify_off
+    alias: "Basement Dehumidifier - Notify Normal Humidity"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.basement_humidity_sensor_humidity
+        below: 45
+    action:
       - service: notify.operational_log
         data:
           title: "Basement Dehumidifier - Normal"

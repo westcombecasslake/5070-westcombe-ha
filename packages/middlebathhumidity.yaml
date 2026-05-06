@@ -57,7 +57,7 @@ automation:
           current_humidity: "{{ states('sensor.middle_bath_humidity') | float(0) }}"
           baseline: "{{ states('input_number.middle_bath_humidity_baseline') | float(0) }}"
           peak: "{{ states('input_number.middle_bath_humidity_peak') | float(0) }}"
-          fan_state: "{{ states('fan.middle_bath_humidity') }}"
+          fan_state: "{{ states('switch.middle_bath_humidity') }}"
           loop_start: "{{ states('input_number.middle_bath_fan_loop_start') | float(0) }}"
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
@@ -81,9 +81,9 @@ automation:
             sequence:
               - condition: template
                 value_template: "{{ time_since_loop_start >= 7200 }}"
-              - service: fan.turn_off
+              - service: switch.turn_off
                 target:
-                  entity_id: fan.middle_bath_humidity
+                  entity_id: switch.middle_bath_humidity
               - service: input_number.set_value
                 target:
                   entity_id: input_number.middle_bath_humidity_baseline
@@ -148,14 +148,14 @@ automation:
                           entity_id: input_number.middle_bath_fan_loop_start
                         data:
                           value: "{{ now().timestamp() }}"
-                      - service: fan.turn_on
+                      - service: switch.turn_on
                         target:
-                          entity_id: fan.middle_bath_humidity
+                          entity_id: switch.middle_bath_humidity
                       # Run for 30 minutes then shut down
                       - delay: "00:30:00"
-                      - service: fan.turn_off
+                      - service: switch.turn_off
                         target:
-                          entity_id: fan.middle_bath_humidity
+                          entity_id: switch.middle_bath_humidity
                       # Reset all tracking values
                       - service: input_number.set_value
                         target:
@@ -193,7 +193,7 @@ automation:
         minutes: "/5"
     condition:
       - condition: state
-        entity_id: fan.middle_bath_humidity
+        entity_id: switch.middle_bath_humidity
         state: "off"
       - condition: template
         value_template: >
@@ -219,7 +219,7 @@ automation:
     alias: "Middle Bath Fan - Manual Timer"
     trigger:
       - platform: state
-        entity_id: fan.middle_bath_humidity
+        entity_id: switch.middle_bath_humidity
         to: "on"
     condition:
       - condition: template
@@ -227,9 +227,9 @@ automation:
           {{ states('input_number.middle_bath_humidity_baseline') | float(0) == 0 }}
     action:
       - delay: "00:30:00"
-      - service: fan.turn_off
+      - service: switch.turn_off
         target:
-          entity_id: fan.middle_bath_humidity
+          entity_id: switch.middle_bath_humidity
 
   # --------------------------------------------------
   # Middle Bath Humidity - Startup Reset
@@ -255,6 +255,6 @@ automation:
           entity_id: input_number.middle_bath_fan_loop_start
         data:
           value: 0
-      - service: fan.turn_off
+      - service: switch.turn_off
         target:
-          entity_id: fan.middle_bath_humidity
+          entity_id: switch.middle_bath_humidity
