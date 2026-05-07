@@ -8,18 +8,25 @@
 #
 # OPERATION:
 # - System enable helper (input_boolean) acts as seasonal on/off switch
-# - Daily runtime calculated at 6 AM based on temperature forecast
+# - Daily runtime calculated at 6 AM using temperature + humidity (ET-based)
 # - Automatic cycle runs at 7:45 AM if system enabled and no rain forecast
 # - Manual 30-minute run available via dashboard button
 # - Deadman safety forces shutoff if valve stays on 60+ minutes
 #
+# ET RUNTIME FORMULA:
+# - temp_factor  = ((temp - 40) * 0.8) + 10       range: ~10-50 min
+# - humidity_mod = 1.5 - (humidity / 100)          range: 0.5-1.5x
+# - runtime      = temp_factor * humidity_mod       clamped: 10-60 min
+# - Examples: 60F/60%RH = 18 min | 75F/50%RH = 34 min | 95F/20%RH = 60 min
+#
 # WEATHER SKIP:
+# - Skips if system is disabled
 # - Skips if current weather state is rainy/pouring/lightning-rainy/snowy-rainy
 # - Skips if today's or tomorrow's forecast condition is in the same bad list
 # - Note: Met.no does not provide precipitation probability (PoP) data
 #
 # NOTIFICATIONS:
-# - operational_log: automatic cycle start
+# - operational_log: cycle start, cycle skip (with reason)
 # - house_notices: manual run start
 # - house_alerts: deadman safety triggered
 #
@@ -45,7 +52,7 @@ input_button:
 
 automation:
   # --------------------------------------------------
-  # Irrigation - Calculate Daily Runtime
+  # Irrigation - Calculate Daily Runtime (ET-Based)
   # --------------------------------------------------
   - id: irrigation_calculate_runtime
     alias: "Irrigation - Calculate Zone Runtime"
@@ -57,24 +64,24 @@ automation:
         entity_id: input_boolean.irrigation_system_enabled
         state: "on"
     action:
-      - choose:
-          - conditions:
-              - condition: numeric_state
-                entity_id: weather.forecast_home_2
-                attribute: temperature
-                below: 80
-            sequence:
-              - service: input_number.set_value
-                target:
-                  entity_id: input_number.irrigation_zone_runtime
-                data:
-                  value: 25
-        default:
-          - service: input_number.set_value
-            target:
-              entity_id: input_number.irrigation_zone_runtime
-            data:
-              value: 45
+      - service: weather.get_forecasts
+        target:
+          entity_id: weather.forecast_home_2
+        data:
+          type: daily
+        response_variable: forecast_data
+      - variables:
+          temp: "{{ state_attr('weather.forecast_home_2', 'temperature') | float }}"
+          humidity: "{{ forecast_data['weather.forecast_home_2']['forecast'][0].humidity | float }}"
+          temp_factor: "{{ ((temp - 40) * 0.8 + 10) | float }}"
+          humidity_modifier: "{{ (1.5 - (humidity / 100)) | float }}"
+          raw_runtime: "{{ (temp_factor * humidity_modifier) | round | int }}"
+          calculated_runtime: "{{ [[raw_runtime, 10] | max, 60] | min }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.irrigation_zone_runtime
+        data:
+          value: "{{ calculated_runtime }}"
 
   # --------------------------------------------------
   # Irrigation - Automatic Morning Cycle
@@ -84,13 +91,6 @@ automation:
     trigger:
       - platform: time
         at: "07:45:00"
-    condition:
-      - condition: state
-        entity_id: input_boolean.irrigation_system_enabled
-        state: "on"
-      - condition: template
-        value_template: >
-          {{ states('weather.forecast_home_2') not in ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] }}
     action:
       - service: weather.get_forecasts
         target:
@@ -98,27 +98,81 @@ automation:
         data:
           type: daily
         response_variable: forecast_data
-      - condition: template
-        value_template: >
-          {% set bad = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] %}
-          {% set conditions = forecast_data['weather.forecast_home_2']['forecast'][:2] | map(attribute='condition') | list %}
-          {{ conditions | select('in', bad) | list | count == 0 }}
-      - service: notify.operational_log
-        data:
-          title: "Irrigation - Automatic Cycle Started"
-          message: >
-            Runtime: {{ states('input_number.irrigation_zone_runtime') | int }} minutes
-            Temperature: {{ state_attr('weather.forecast_home_2', 'temperature') }}°F
-            Weather: {{ states('weather.forecast_home_2') }}
-            Start Time: {{ now().strftime('%I:%M %p') }}
-      - service: switch.turn_on
-        target:
-          entity_id: switch.patio_drip_sprinkler
-      - delay:
-          minutes: "{{ states('input_number.irrigation_zone_runtime') | int }}"
-      - service: switch.turn_off
-        target:
-          entity_id: switch.patio_drip_sprinkler
+      - variables:
+          bad_conditions: "{{ ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] }}"
+          current_weather: "{{ states('weather.forecast_home_2') }}"
+          today_condition: "{{ forecast_data['weather.forecast_home_2']['forecast'][0].condition }}"
+          tomorrow_condition: "{{ forecast_data['weather.forecast_home_2']['forecast'][1].condition }}"
+          temperature: "{{ state_attr('weather.forecast_home_2', 'temperature') }}"
+          humidity: "{{ forecast_data['weather.forecast_home_2']['forecast'][0].humidity }}"
+          runtime: "{{ states('input_number.irrigation_zone_runtime') | int }}"
+      - choose:
+          # Branch 1 - System disabled
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.irrigation_system_enabled
+                state: "off"
+            sequence:
+              - service: notify.operational_log
+                data:
+                  title: "Irrigation - Cycle Skipped"
+                  message: >
+                    Reason: System disabled
+                    Time: {{ now().strftime('%I:%M %p') }}
+
+          # Branch 2 - Current weather is bad
+          - conditions:
+              - condition: template
+                value_template: "{{ current_weather in bad_conditions }}"
+            sequence:
+              - service: notify.operational_log
+                data:
+                  title: "Irrigation - Cycle Skipped"
+                  message: >
+                    Reason: Currently {{ current_weather }}
+                    Today: {{ today_condition }}
+                    Tomorrow: {{ tomorrow_condition }}
+                    Temperature: {{ temperature }}°F
+                    Humidity: {{ humidity }}%
+                    Time: {{ now().strftime('%I:%M %p') }}
+
+          # Branch 3 - Bad weather forecast today or tomorrow
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ today_condition in bad_conditions or tomorrow_condition in bad_conditions }}
+            sequence:
+              - service: notify.operational_log
+                data:
+                  title: "Irrigation - Cycle Skipped"
+                  message: >
+                    Reason: {% if today_condition in bad_conditions %}Rainy forecast today{% else %}Rainy forecast tomorrow{% endif %}
+                    Today: {{ today_condition }}
+                    Tomorrow: {{ tomorrow_condition }}
+                    Temperature: {{ temperature }}°F
+                    Humidity: {{ humidity }}%
+                    Time: {{ now().strftime('%I:%M %p') }}
+
+        # Default - All clear, run the cycle
+        default:
+          - service: notify.operational_log
+            data:
+              title: "Irrigation - Automatic Cycle Started"
+              message: >
+                Runtime: {{ runtime }} minutes
+                Temperature: {{ temperature }}°F
+                Humidity: {{ humidity }}%
+                Today: {{ today_condition }}
+                Tomorrow: {{ tomorrow_condition }}
+                Time: {{ now().strftime('%I:%M %p') }}
+          - service: switch.turn_on
+            target:
+              entity_id: switch.patio_drip_sprinkler
+          - delay:
+              minutes: "{{ runtime }}"
+          - service: switch.turn_off
+            target:
+              entity_id: switch.patio_drip_sprinkler
 
   # --------------------------------------------------
   # Irrigation - Manual 30-Minute Run
@@ -162,7 +216,7 @@ automation:
     action:
       - service: notify.house_alerts
         data:
-          title: "⚠️ Irrigation - Deadman Safety Triggered"
+          title: "Irrigation - Deadman Safety Triggered"
           message: >
             Irrigation has been running for 60+ minutes!
             Forcing shutoff for safety.

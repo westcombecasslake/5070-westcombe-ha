@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Humidity & Laundry</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #1e2d20;
+    --green: #00ff88;
+    --green-dim: #00cc6a;
+    --green-dark: #003d1f;
+    --green-muted: #0a2e18;
+    --amber: #ffb800;
+    --amber-dark: #3d2c00;
+    --blue: #4da6ff;
+    --blue-dark: #0a1e33;
+    --text: #e6ffe8;
+    --text-muted: #6b8f72;
+    --text-dim: #3d5c42;
+    --font: 'Courier New', 'Lucida Console', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 24px 20px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  h1 { font-size: 14px; font-weight: normal; color: var(--green); letter-spacing: 2px; text-transform: uppercase; }
+  .timestamp { font-size: 11px; color: var(--text-muted); }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    margin-top: 24px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 2px; height: 100%;
+    background: var(--green-dim);
+    opacity: 0.3;
+  }
+  .card.active::before { opacity: 1; background: var(--green); }
+  .card.detected::before { opacity: 1; background: var(--amber); }
+  .card.boost::before { opacity: 1; background: var(--blue); }
+  .room-name { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+  .value-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+  .value { font-size: 32px; color: var(--green); line-height: 1; }
+  .value.warn { color: var(--amber); }
+  .unit { font-size: 12px; color: var(--text-muted); }
+  .bar-track { height: 2px; background: var(--green-dark); margin-bottom: 10px; border-radius: 1px; }
+  .bar-fill { height: 2px; background: var(--green-dim); border-radius: 1px; transition: width 1s; }
+  .bar-fill.warn { background: var(--amber); }
+  .threshold-note { font-size: 10px; color: var(--text-dim); margin-bottom: 10px; }
+  .divider { border-top: 1px solid var(--border); margin: 10px 0; }
+  .status-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--text-muted);
+    padding: 5px 0;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--text-dim); }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.warn { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .dot.blue { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+  .status-text { color: var(--text); }
+  .status-text.green { color: var(--green); }
+  .status-text.amber { color: var(--amber); }
+  .status-text.blue { color: var(--blue); }
+  .progress-track { height: 1px; background: var(--green-dark); margin-top: 4px; border-radius: 1px; }
+  .progress-fill { height: 1px; border-radius: 1px; transition: width 1s; }
+  .progress-fill.green { background: var(--green-dim); }
+  .progress-fill.amber { background: var(--amber); }
+  .progress-fill.blue { background: var(--blue); }
+  .laundry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .ref-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+  .ref-row:last-child { border-bottom: none; }
+  .ref-key { color: var(--text-muted); }
+  .ref-val { color: var(--green-dim); }
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .badge {
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 2px;
+    border: 1px solid;
+  }
+  .badge-green { border-color: var(--green-dim); color: var(--green); background: var(--green-muted); }
+  .badge-amber { border-color: var(--amber); color: var(--amber); background: var(--amber-dark); }
+  .badge-gray { border-color: var(--text-dim); color: var(--text-muted); background: transparent; }
+  .badge-blue { border-color: var(--blue); color: var(--blue); background: var(--blue-dark); }
+  .error { color: #ff4444; font-size: 11px; }
+  .loading { color: var(--text-dim); font-size: 11px; }
+  footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 10px; color: var(--text-dim); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>// Environmental monitor</h1>
+  <span class="timestamp" id="clock">--:--:--</span>
+</header>
+
+<div class="section-label">Bathrooms</div>
+<div class="grid" id="bath-grid">
+  <div class="card"><div class="loading">Connecting...</div></div>
+  <div class="card"><div class="loading">Connecting...</div></div>
+  <div class="card"><div class="loading">Connecting...</div></div>
+</div>
+
+<div class="section-label">Laundry</div>
+<div class="laundry-grid" id="laundry-grid">
+  <div class="card"><div class="loading">Connecting...</div></div>
+  <div class="card"><div class="loading">Connecting...</div></div>
+</div>
+
+<footer>
+  <span>Refreshes every 30s</span>
+  <span id="last-update">Never updated</span>
+</footer>
+
+<script>
+const HA = 'https://45yt8uxuisvmflbjzkczr77kr1jum1m0.ui.nabu.casa';
+const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzY2U3OWJjYTQxOTI0YTNjYjM3ODM0ODlmZTBhMmI3MiIsImlhdCI6MTc3MjM5ODMwNywiZXhwIjoyMDg3NzU4MzA3fQ.UyfL-yfcrwXyA0tLisX9GkSdJ8o8FUfRGk5NEEsAq0s';
+
+const ENTITIES = [
+  'sensor.master_bath_humidity',
+  'sensor.middle_bath_humidity',
+  'sensor.east_suite_bathroom_humidity',
+  'switch.master_bath_fan',
+  'switch.middle_bath_humidity',
+  'switch.east_suite_bathroom_humidity',
+  'input_number.master_bath_humidity_baseline',
+  'input_number.master_bath_fan_loop_start',
+  'input_number.middle_bath_humidity_baseline',
+  'input_number.middle_bath_fan_loop_start',
+  'input_number.east_bath_humidity_baseline',
+  'input_number.east_bath_fan_loop_start',
+  'sensor.laundry_temperature',
+  'switch.laundry_fan_timer',
+  'sensor.dryer_monitor_current_power',
+  'input_number.laundry_temp_baseline',
+  'script.hvac_exhaust_boost',
+];
+
+const BATHS = [
+  { name: 'Master bath', humidity: 'sensor.master_bath_humidity', fan: 'switch.master_bath_fan', baseline: 'input_number.master_bath_humidity_baseline', loop: 'input_number.master_bath_fan_loop_start' },
+  { name: 'Middle bath', humidity: 'sensor.middle_bath_humidity', fan: 'switch.middle_bath_humidity', baseline: 'input_number.middle_bath_humidity_baseline', loop: 'input_number.middle_bath_fan_loop_start' },
+  { name: 'East suite',  humidity: 'sensor.east_suite_bathroom_humidity', fan: 'switch.east_suite_bathroom_humidity', baseline: 'input_number.east_bath_humidity_baseline', loop: 'input_number.east_bath_fan_loop_start' },
+];
+
+async function fetchStates() {
+  const params = ENTITIES.map(e => `entity_id=${e}`).join('&');
+  const res = await fetch(`${HA}/api/states?${params}`, {
+    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const map = {};
+  data.forEach(e => { map[e.entity_id] = e; });
+  return map;
+}
+
+function getVal(map, id, fallback = 0) {
+  const e = map[id];
+  if (!e) return fallback;
+  const v = parseFloat(e.state);
+  return isNaN(v) ? fallback : v;
+}
+
+function getState(map, id) {
+  return map[id] ? map[id].state : 'unknown';
+}
+
+function bathStatus(hum, fanOn, baseline, loopStart) {
+  const now = Date.now() / 1000;
+  if (fanOn && baseline > 0) {
+    const elapsed = loopStart > 0 ? now - loopStart : 0;
+    const remaining = Math.max(0, 30 * 60 - elapsed);
+    const pct = Math.min(100, (elapsed / (30 * 60)) * 100);
+    return { state: 'running', label: `Fan running · ${Math.ceil(remaining / 60)}m remaining`, pct, color: 'green' };
+  }
+  if (!fanOn && baseline > 0) {
+    const elapsed = loopStart > 0 ? now - loopStart : 0;
+    const remaining = Math.max(0, 5 * 60 - elapsed);
+    const pct = Math.min(100, (elapsed / (5 * 60)) * 100);
+    return { state: 'detected', label: `Detected · fan on in ${Math.ceil(remaining / 60)}m`, pct, color: 'amber' };
+  }
+  return { state: 'idle', label: 'Idle', pct: 0, color: 'gray' };
+}
+
+function threshold(hum) {
+  return hum < 50 ? '8% rise · below 50%' : '5% rise · above 50%';
+}
+
+function barPct(hum) {
+  return Math.min(100, (hum / 100) * 100);
+}
+
+function renderBath(room, map, boostOn) {
+  const hum = getVal(map, room.humidity);
+  const fanOn = getState(map, room.fan) === 'on';
+  const baseline = getVal(map, room.baseline);
+  const loopStart = getVal(map, room.loop);
+  const status = bathStatus(hum, fanOn, baseline, loopStart);
+  const isWarn = hum >= 55;
+  const cycleComplete = !fanOn && baseline === 0 && boostOn;
+
+  let cardClass = 'card';
+  if (status.state === 'running') cardClass += ' active';
+  else if (status.state === 'detected') cardClass += ' detected';
+  else if (cycleComplete) cardClass += ' boost';
+
+  let statusDot = '';
+  let statusText = '';
+  if (status.state === 'running') {
+    statusDot = '<div class="dot on"></div>';
+    statusText = `<span class="status-text green">${status.label}</span>`;
+  } else if (status.state === 'detected') {
+    statusDot = '<div class="dot warn"></div>';
+    statusText = `<span class="status-text amber">${status.label}</span>`;
+  } else {
+    statusDot = '<div class="dot"></div>';
+    statusText = `<span class="status-text">${cycleComplete ? 'Cycle complete' : 'Idle'}</span>`;
+  }
+
+  let progressBar = '';
+  if (status.state !== 'idle' || cycleComplete) {
+    const pct = status.state !== 'idle' ? status.pct : 0;
+    progressBar = `<div class="progress-track"><div class="progress-fill ${status.color}" style="width:${pct}%"></div></div>`;
+  }
+
+  let boostRow = '';
+  if (cycleComplete) {
+    boostRow = `
+      <div class="status-row" style="margin-top:6px">
+        <div class="dot blue"></div>
+        <span class="status-text blue">HVAC boost running</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill blue" style="width:50%"></div></div>`;
+  }
+
+  return `
+    <div class="${cardClass}">
+      <div class="room-name">${room.name}</div>
+      <div class="value-row">
+        <div class="value ${isWarn ? 'warn' : ''}">${hum.toFixed(1)}</div>
+        <div class="unit">%RH</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${isWarn ? 'warn' : ''}" style="width:${barPct(hum)}%"></div></div>
+      <div class="threshold-note">Threshold: ${threshold(hum)}</div>
+      <div class="divider"></div>
+      <div class="status-row">${statusDot}${statusText}</div>
+      ${progressBar}
+      ${boostRow}
+    </div>`;
+}
+
+function renderLaundry(map, boostOn) {
+  const temp = getVal(map, 'sensor.laundry_temperature');
+  const fanOn = getState(map, 'switch.laundry_fan_timer') === 'on';
+  const power = getVal(map, 'sensor.dryer_monitor_current_power');
+  const baseline = getVal(map, 'input_number.laundry_temp_baseline');
+  const dryerOn = power > 200;
+  const cutoff = baseline + 3;
+  const isWarm = temp > cutoff && baseline > 0;
+
+  const liveCard = `
+    <div class="card ${fanOn ? 'active' : ''}">
+      <div class="room-name">Laundry room</div>
+      <div class="value-row">
+        <div class="value ${isWarm ? 'warn' : ''}">${temp.toFixed(1)}</div>
+        <div class="unit">°F</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${isWarm ? 'warn' : ''}" style="width:${Math.min(100,(temp/100)*100)}%"></div></div>
+      ${baseline > 0 ? `<div class="threshold-note">Baseline: ${baseline.toFixed(1)}°F · cutoff: ${cutoff.toFixed(1)}°F</div>` : '<div class="threshold-note">No active baseline</div>'}
+      <div class="divider"></div>
+      <div class="badge-row">
+        ${dryerOn
+          ? `<span class="badge badge-amber">Dryer on · ${Math.round(power)}W</span>`
+          : `<span class="badge badge-gray">Dryer off</span>`}
+        ${fanOn
+          ? `<span class="badge badge-green">Fan running</span>`
+          : `<span class="badge badge-gray">Fan off</span>`}
+        ${boostOn ? `<span class="badge badge-blue">HVAC boost</span>` : ''}
+      </div>
+    </div>`;
+
+  const refCard = `
+    <div class="card">
+      <div class="room-name">Coded thresholds</div>
+      <div class="divider" style="margin-top:0"></div>
+      <div class="ref-row"><span class="ref-key">Dryer on</span><span class="ref-val">&gt; 200W</span></div>
+      <div class="ref-row"><span class="ref-key">Dryer off</span><span class="ref-val">&lt; 2W</span></div>
+      <div class="ref-row"><span class="ref-key">Cooldown target</span><span class="ref-val">baseline + 3°F</span></div>
+      <div class="ref-row"><span class="ref-key">Max runtime</span><span class="ref-val">45 min</span></div>
+      <div class="ref-row"><span class="ref-key">Current power</span><span class="ref-val">${Math.round(power)}W</span></div>
+    </div>`;
+
+  return liveCard + refCard;
+}
+
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+
+async function refresh() {
+  try {
+    const map = await fetchStates();
+    const boostOn = getState(map, 'script.hvac_exhaust_boost') === 'on';
+
+    document.getElementById('bath-grid').innerHTML =
+      BATHS.map(b => renderBath(b, map, boostOn)).join('');
+
+    document.getElementById('laundry-grid').innerHTML = renderLaundry(map, boostOn);
+
+    document.getElementById('last-update').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    document.getElementById('last-update').textContent = 'Error: ' + err.message;
+  }
+}
+
+updateClock();
+setInterval(updateClock, 1000);
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
