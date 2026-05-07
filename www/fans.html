@@ -66,8 +66,8 @@
     border-radius: 4px;
     padding: 16px;
   }
-  .card.card-amber { border-top-color: var(--amber); }
   .card.card-blue { border-top-color: var(--blue); }
+  .card.card-amber { border-top-color: var(--amber); }
   .card.card-dim { border-top-color: var(--border); }
   .card-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 10px; }
   .value-row { display: flex; align-items: baseline; gap: 4px; margin-bottom: 6px; }
@@ -89,17 +89,14 @@
   }
   .pill-idle { background: var(--bg); color: var(--text-muted); }
   .pill-running { background: var(--teal-bg); color: var(--teal-dim); }
-  .pill-detected { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
   .pill-boost { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
   .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .dot-teal { background: var(--teal); }
-  .dot-amber { background: var(--amber); }
   .dot-blue { background: var(--blue); }
   .dot-dim { background: var(--text-dim); }
   .progress-track { height: 2px; background: var(--bg); border-radius: 2px; margin-top: 4px; }
   .progress-fill { height: 2px; border-radius: 2px; transition: width 1s; }
   .pf-teal { background: var(--teal); }
-  .pf-amber { background: var(--amber); }
   .pf-blue { background: var(--blue); }
   .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .badge {
@@ -210,12 +207,6 @@ function bathStatus(fanOn, baseline, loopStart) {
     const pct = Math.min(100, (elapsed/(30*60))*100);
     return { state:'running', label:`Fan running · ${Math.ceil(remaining/60)}m remaining`, pct, color:'teal' };
   }
-  if (!fanOn && baseline > 0) {
-    const elapsed = loopStart > 0 ? now - loopStart : 0;
-    const remaining = Math.max(0, 5*60 - elapsed);
-    const pct = Math.min(100, (elapsed/(5*60))*100);
-    return { state:'detected', label:`Detected · fan on in ${Math.ceil(remaining/60)}m`, pct, color:'amber' };
-  }
   return { state:'idle', label:'Idle', pct:0, color:'dim' };
 }
 
@@ -231,18 +222,14 @@ function renderBath(room, map, boostOn) {
   const barPct = Math.min(100, hum);
 
   let cardClass = 'card';
-  if (status.state === 'running') cardClass += '';
-  else if (status.state === 'detected') cardClass += ' card-amber';
-  else if (cycleComplete) cardClass += ' card-blue';
+  if (cycleComplete) cardClass += ' card-blue';
+  else if (status.state === 'running') cardClass += '';
   else cardClass += ' card-dim';
 
   let pillHtml = '';
   if (status.state === 'running') {
     pillHtml = `<div class="status-pill pill-running"><div class="dot dot-teal"></div>${status.label}</div>
       <div class="progress-track"><div class="progress-fill pf-teal" style="width:${status.pct}%"></div></div>`;
-  } else if (status.state === 'detected') {
-    pillHtml = `<div class="status-pill pill-detected"><div class="dot dot-amber"></div>${status.label}</div>
-      <div class="progress-track"><div class="progress-fill pf-amber" style="width:${status.pct}%"></div></div>`;
   } else {
     pillHtml = `<div class="status-pill pill-idle"><div class="dot dot-dim"></div>${cycleComplete ? 'Cycle complete' : 'Idle'}</div>`;
   }

@@ -9,3 +9,4 @@ home-assistant.log.fault
 .ha_run.lock
 productionbackup/
 .claudecode/
+.cache/
