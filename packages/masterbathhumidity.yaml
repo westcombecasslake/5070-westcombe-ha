@@ -60,7 +60,7 @@ automation:
           loop_start: "{{ states('input_number.master_bath_fan_loop_start') | float(0) }}"
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
-          last_reading_age: "{{ (time_now - as_timestamp(states.sensor.master_bath_humidity.last_changed, 0)) | float(0) }}"
+
 
       - service: input_number.set_value
         target:
@@ -125,8 +125,7 @@ automation:
                         value_template: >
                           {% set threshold = 8 if current_humidity < 50 else 5 %}
                           {{ peak > 0
-                             and (current_humidity - peak) >= threshold
-                             and last_reading_age <= 900 }}
+                             and (current_humidity - peak) >= threshold }}
                     sequence:
                       # Lock baseline and peak at detection time
                       - service: input_number.set_value

@@ -1,6 +1,6 @@
 # Environmental Control
 
-**Last Updated:** April 2026
+**Last Updated:** May 2026
 
 ---
 
@@ -129,23 +129,36 @@ Automatically controls basement dehumidifier outlet to maintain 45-50% humidity 
 
 ### What It Does
 
-Automatically detects showers by monitoring humidity rise patterns and runs the exhaust fan to remove moisture, followed by turning on the HVAC fan to further equalize humidity throughout the house. Uses relative humidity tracking (baseline vs. peak) to work correctly regardless of seasonal outdoor humidity levels. Includes a comfort delay before the fan starts and a fixed runtime per HVAC guidelines. Includes manual timer for non-shower ventilation needs.
+Automatically detects showers by monitoring humidity rise patterns and runs the exhaust fan to remove moisture, followed by turning on the HVAC fan to further equalize humidity throughout the house. Uses relative humidity tracking (baseline vs. peak) to work correctly regardless of seasonal outdoor humidity levels. Includes a fixed runtime per HVAC guidelines and a manual timer for non-shower ventilation needs.
 
-**Rationale:** Prevents mold growth and moisture damage by removing shower humidity. Traditional fixed timers waste energy running fan when not needed, while humidity-based control responds only to actual moisture events. The relative rise method works year-round without seasonal adjustments. A flat 30-minute runtime is used based on observed sensor data and HVAC guidelines. The comfort delay prevents the fan from starting immediately, avoiding a sudden rush of cold air during showering. After the exhaust fan completes its cycle, the HVAC fan is activated to help distribute and equalize humidity throughout the house.
+**Rationale:** Prevents mold growth and moisture damage by removing shower humidity. Traditional fixed timers waste energy running fan when not needed, while humidity-based control responds only to actual moisture events. The relative rise method works year-round without seasonal adjustments. A flat 30-minute runtime is used based on observed sensor data and HVAC guidelines. After the exhaust fan completes its cycle, the HVAC fan is activated to help distribute and equalize humidity throughout the house.
 
 This pattern is deployed as separate YAML packages per bathroom, each with its own helpers and entities to allow fully independent monitoring and control.
+
+### Hardware
+
+**Exhaust Fans — Panasonic WhisperFit (all bathrooms and laundry):**
+- Installed: April 2026
+- Power draw: 8–15W
+- Ramps up to full speed over several minutes by design, self-optimizing for duct back-pressure
+- Significantly quieter than traditional exhaust fans
+
+**Humidity Sensors — Inovelli On/Off Switch (master, middle, east suite):**
+- Each bathroom uses an Inovelli on/off switch with an integrated humidity sensor
+- Sensors report on state change, providing frequent updates during active humidity events
+- Entity format: `sensor.<room>_humidity`
+
+**Entry Bath Fan — Insteon Switch:**
+- Entity: `light.entry_bath_fan`
+- Simple on/off control, no humidity sensor
 
 ### How It Works
 
 **Detection Phase (polling every 30 seconds):**
 - Tracks current humidity and maintains a rolling peak value
-- Detection fires when two conditions are both met:
-  1. Humidity has risen above the peak by the threshold (8% below 50% ambient, 5% above 50% ambient)
-  2. The last sensor reading was within the past 15 minutes (rate-of-rise gate)
-- The 15-minute gate is critical: YoLink sensors report hourly in stable conditions, so slow ambient humidity drift accumulates between reports and can appear as a single large jump. Requiring a recent reading confirms the rise happened quickly — the signature of a shower rather than gradual drift
+- Detection fires when humidity has risen above the peak by the threshold: 8% when ambient is below 50%, 5% when ambient is at or above 50%
 - Baseline and peak are locked at detection time — baseline to the pre-rise peak, peak to the current humidity
-- A 5-minute comfort delay runs before the fan turns on (prevents cold air during showering)
-- Fan turns on unconditionally after the delay — no re-check
+- Fan turns on immediately at detection
 
 **Fan Running Phase:**
 - Fan runs for a flat 30 minutes per HVAC guidelines
@@ -174,8 +187,8 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 #### Master Bath
 
 **Hardware:**
-- YoLink Humidity Sensor: `sensor.master_bath_humidity`
-- Insteon Switch (exhaust fan): `light.master_bath_fan`
+- Inovelli On/Off Switch (humidity sensor): `sensor.master_bath_humidity`
+- Insteon Switch (exhaust fan): `switch.master_bath_fan`
 
 **Helpers (auto-managed, typically no adjustment needed):**
 - `input_number.master_bath_humidity_baseline` - Starting humidity when shower begins
@@ -194,8 +207,8 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 #### Middle Bath
 
 **Hardware:**
-- YoLink Humidity Sensor: `sensor.middle_bath_humidity`
-- Exhaust fan: `fan.middle_bath_humidity`
+- Inovelli On/Off Switch (humidity sensor): `sensor.middle_bath_humidity`
+- Exhaust fan: `switch.middle_bath_humidity`
 
 **Helpers (auto-managed, typically no adjustment needed):**
 - `input_number.middle_bath_humidity_baseline` - Starting humidity when shower begins
@@ -214,8 +227,8 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 #### East Suite
 
 **Hardware:**
-- YoLink Humidity Sensor: `sensor.east_suite_bathroom_humidity`
-- Exhaust fan: `fan.east_suite_bathroom_humidity`
+- Inovelli On/Off Switch (humidity sensor): `sensor.east_suite_bathroom_humidity`
+- Exhaust fan: `switch.east_suite_bathroom_humidity`
 
 **Helpers (auto-managed, typically no adjustment needed):**
 - `input_number.east_bath_humidity_baseline` - Starting humidity when shower begins
@@ -230,14 +243,6 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 - `East Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** eastbathhumidity.yaml
-
-#### Switch Technology Notes
-
-The master bath exhaust fan uses an Insteon switch (`light.master_bath_fan`). The middle bath and east bath exhaust fans use Matter/Thread switches. See: insteon-integration.md, matter-thread-integration.md
-
-#### Sensor Notes
-
-Bathroom humidity sensors are YoLink LoRa devices (model 8003). These sensors report infrequently by design to maximize battery life — they wake up and report rapidly on fast humidity rises (typical of showers) but report hourly in stable conditions. The 15-minute rate-of-rise gate in the detection logic accounts for this behaviour, ensuring that slow ambient drift accumulating between hourly reports cannot satisfy the detection condition regardless of magnitude. Do not configure YoLink alert thresholds on these sensors — alert-triggered reporting bursts can interfere with detection logic and provide no benefit over the existing approach.
 
 ---
 
@@ -264,6 +269,58 @@ Automatically turns off the entry bathroom fan after a fixed period to prevent e
 - Action: Turns off fan to prevent waste
 
 **YAML:** entryfan.yaml
+
+---
+
+## Laundry Dryer Fan Control
+
+### What It Does
+
+Automatically controls a laundry room exhaust fan based on dryer usage and temperature monitoring. Uses adaptive baseline temperature tracking to efficiently manage fan runtime.
+
+### Hardware
+
+**Inovelli On/Off Switch:**
+- Entity: `switch.laundry_fan_timer` — fan control
+- Integrated temperature sensor: `sensor.laundry_temperature` — drives cooldown logic
+- The switch provides both fan control and the room temperature sensor used to determine when conditions have returned to baseline
+
+**Panasonic WhisperFit Exhaust Fan:**
+- See Bathroom Humidity Control — Hardware for full fan specifications
+- Installed April 2026; same model used in all bathrooms
+
+**Dryer Power Monitor:**
+- Entity: `sensor.dryer_monitor_current_power`
+- Detects dryer on (>200W) and dryer off (<2W)
+
+### Key Entities
+
+**Sensors:**
+- `sensor.laundry_temperature` - Current laundry room temperature (from Inovelli switch)
+- `sensor.dryer_monitor_current_power` - Dryer power draw
+
+**Switches:**
+- `switch.laundry_fan_timer` - Exhaust fan control
+
+**Helpers:**
+- `input_number.laundry_temp_baseline` - Baseline temperature captured at dryer start
+- `input_number.laundry_dryer_last_off` - Timestamp of last dryer off event
+
+### Automations
+
+**Dryer Fan Control (Main):**
+- `laundry_dryer_fan_control` — mode: restart
+- Detects dryer ON (>200W): captures temperature baseline, turns fan on
+- Detects dryer OFF (<2W): waits for temperature to drop to baseline + 3°F (20-minute timeout), then runs fan for 10 additional minutes before shutting off
+- Triggers HVAC exhaust boost when fan stops
+- mode: restart means a new dryer-off trigger during cooldown cancels and restarts with a fresh 20-minute deadline
+
+**Baseline Timeout:**
+- `laundry_baseline_timeout` — mode: single
+- Resets temperature baseline to 0 after 4 hours of dryer inactivity
+- Runs every 30 minutes; only resets if baseline > 0
+
+**YAML:** laundry.yaml
 
 ---
 
@@ -320,20 +377,20 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 
 **YoLink Sensors:**
 - Basement humidity sensor (dehumidifier control)
-- Master bath humidity sensor (shower detection)
-- Middle bath humidity sensor (shower detection)
-- East bath humidity sensor (shower detection)
 - See: yolink-integration.md
 
 **Insteon Switches:**
 - Basement dehumidifier outlet: `switch.scheduled_power_save`
-- Master bath fan: `light.master_bath_fan`
+- Master bath fan: `switch.master_bath_fan`
+- Entry bath fan: `light.entry_bath_fan`
 - See: insteon-integration.md
 
-**Matter/Thread Switches:**
-- Middle bath fan: `fan.middle_bath_humidity`
-- East Suite fan: `fan.east_suite_bathroom_humidity`
-- See: matter-thread-integration.md
+**Inovelli Switches:**
+- Master bath humidity sensor: `sensor.master_bath_humidity`
+- Middle bath fan and humidity sensor: `switch.middle_bath_humidity`, `sensor.middle_bath_humidity`
+- East suite fan and humidity sensor: `switch.east_suite_bathroom_humidity`, `sensor.east_suite_bathroom_humidity`
+- Laundry fan and temperature sensor: `switch.laundry_fan_timer`, `sensor.laundry_temperature`
+- See: inovelli-integration.md
 
 ---
 
@@ -350,16 +407,13 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 - Check `switch.scheduled_power_save` responds to manual control
 
 **Bathroom fan not triggering on shower** (applies to any bathroom instance):
-- Check that the humidity sensor is updating — use Developer Tools → Template to check `last_reading_age`:
-  `{{ (now().timestamp() - as_timestamp(states.sensor.master_bath_humidity.last_changed)) / 60 | round(1) }}` (substitute sensor name as needed)
-- If age > 15 minutes at the time of the shower, the rate-of-rise gate blocked detection — this is expected behaviour when sensor reporting is slow
+- Check that the humidity sensor is updating — use Developer Tools → Template to verify the sensor is reporting recent values
 - Verify humidity rise exceeded threshold (8% below 50%, 5% above 50%)
-- On high-humidity days, shower rises may be smaller — the rate-of-rise gate becomes the primary filter in these conditions
+- On high-humidity days, shower rises may be smaller and may not clear the threshold
 
 **Fan triggered with no shower:**
 - Check sensor history for the rise pattern — was it a fast jump (minutes) or slow climb (hours)?
 - Fast jump with no shower: could be steam from cooking, open windows, or other moisture source
-- Slow climb that appears as a jump: rate-of-rise gate should have blocked this — check last_reading_age at time of trigger
 
 **Fan won't turn off after shower:**
 - Fan runs for a flat 30 minutes then stops automatically
@@ -382,5 +436,4 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 - `/config/packages/middlebathhumidity.yaml`
 - `/config/packages/eastbathhumidity.yaml`
 - `/config/packages/entryfan.yaml`
-
----
+- `/config/packages/laundry.yaml`
