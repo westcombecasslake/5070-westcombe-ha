@@ -6,8 +6,8 @@
 #   - Rate-of-rise gate filters ambient drift from shower events
 #   - Flat 30-minute runtime per HVAC guidelines
 #   - 2-hour safety timeout (backstop only)
-#   - Startup reset on HA restart
-#   - Manual fan 30-minute auto-off
+#   - Startup reset on HA restart or automation reload
+#   - Manual fan 30-minute auto-off, aborts if humidity takes over
 #   - HVAC exhaust boost after cycle
 # ==================================================
 
@@ -61,7 +61,6 @@ automation:
           time_now: "{{ now().timestamp() }}"
           time_since_loop_start: "{{ (time_now - loop_start) if loop_start > 0 else 0 }}"
 
-
       - service: input_number.set_value
         target:
           entity_id: input_number.east_bath_humidity_last_update
@@ -109,11 +108,6 @@ automation:
           # Case 2: Full shower cycle
           # Detect → fan on → 30-min run → fan off → reset
           # → HVAC boost.
-          #
-          # Detection requires both:
-          #   - Rise >= threshold (8% below 50%, 5% above 50%)
-          #   - Last sensor reading within 15 minutes
-          #     (filters slow ambient drift from hourly reports)
           # --------------------------------------------------
           - conditions:
               - condition: template
@@ -177,10 +171,18 @@ automation:
                     target:
                       entity_id: input_number.east_bath_humidity_peak
                     data:
-                      value: "{{ current_humidity }}"
+                      value: >
+                        {% if peak == 0 or current_humidity <= peak + 2 %}
+                          {{ current_humidity }}
+                        {% else %}
+                          {{ peak }}
+                        {% endif %}
 
   # --------------------------------------------------
   # East Bath Humidity - Timeout Reset
+  #
+  # Resets helpers if fan has been off for 15 minutes.
+  # Uses native HA duration check — no helper dependency.
   # --------------------------------------------------
   - id: east_bath_humidity_timeout
     alias: "East Bath Humidity - Timeout"
@@ -191,11 +193,7 @@ automation:
       - condition: state
         entity_id: switch.east_suite_bathroom_humidity
         state: "off"
-      - condition: template
-        value_template: >
-          {% set last_update = states('input_number.east_bath_humidity_last_update') | float(0) %}
-          {% set time_now = now().timestamp() %}
-          {{ (time_now - last_update) > 900 }}
+        for: "00:15:00"
     action:
       - service: input_number.set_value
         target:
@@ -207,9 +205,18 @@ automation:
           entity_id: input_number.east_bath_humidity_peak
         data:
           value: 0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.east_bath_fan_loop_start
+        data:
+          value: 0
 
   # --------------------------------------------------
   # East Bath Fan - Manual Timer
+  #
+  # Turns fan off after 30 minutes if manually turned on.
+  # Aborts mid-countdown if humidity automation takes over
+  # (baseline becomes non-zero).
   # --------------------------------------------------
   - id: east_bath_fan_manual_timer
     alias: "East Bath Fan - Manual Timer"
@@ -222,7 +229,20 @@ automation:
         value_template: >
           {{ states('input_number.east_bath_humidity_baseline') | float(0) == 0 }}
     action:
-      - delay: "00:30:00"
+      # Check every 5 minutes whether humidity automation has taken over.
+      # Exits early if baseline becomes non-zero.
+      - repeat:
+          while:
+            - condition: template
+              value_template: >
+                {{ states('input_number.east_bath_humidity_baseline') | float(0) == 0
+                   and repeat.index <= 6 }}
+          sequence:
+            - delay: "00:05:00"
+      # Only turn off if humidity automation did not take over
+      - condition: template
+        value_template: >
+          {{ states('input_number.east_bath_humidity_baseline') | float(0) == 0 }}
       - service: switch.turn_off
         target:
           entity_id: switch.east_suite_bathroom_humidity
@@ -235,6 +255,8 @@ automation:
     trigger:
       - platform: homeassistant
         event: start
+      - platform: event
+        event_type: automation_reloaded
     action:
       - service: input_number.set_value
         target:

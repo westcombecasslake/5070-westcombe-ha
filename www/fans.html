@@ -207,6 +207,9 @@ function bathStatus(fanOn, baseline, loopStart) {
     const pct = Math.min(100, (elapsed/(30*60))*100);
     return { state:'running', label:`Fan running · ${Math.ceil(remaining/60)}m remaining`, pct, color:'teal' };
   }
+  if (fanOn && baseline === 0) {
+    return { state:'manual', label:'Fan on · manual', pct:0, color:'teal' };
+  }
   return { state:'idle', label:'Idle', pct:0, color:'dim' };
 }
 
@@ -223,13 +226,15 @@ function renderBath(room, map, boostOn) {
 
   let cardClass = 'card';
   if (cycleComplete) cardClass += ' card-blue';
-  else if (status.state === 'running') cardClass += '';
+  else if (status.state === 'running' || status.state === 'manual') cardClass += '';
   else cardClass += ' card-dim';
 
   let pillHtml = '';
   if (status.state === 'running') {
     pillHtml = `<div class="status-pill pill-running"><div class="dot dot-teal"></div>${status.label}</div>
       <div class="progress-track"><div class="progress-fill pf-teal" style="width:${status.pct}%"></div></div>`;
+  } else if (status.state === 'manual') {
+    pillHtml = `<div class="status-pill pill-running"><div class="dot dot-teal"></div>Fan on · manual</div>`;
   } else {
     pillHtml = `<div class="status-pill pill-idle"><div class="dot dot-dim"></div>${cycleComplete ? 'Cycle complete' : 'Idle'}</div>`;
   }
