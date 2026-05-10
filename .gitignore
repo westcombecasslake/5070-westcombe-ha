@@ -10,3 +10,4 @@ home-assistant.log.fault
 productionbackup/
 .claudecode/
 .cache/.cache/brands/
+.cache/brands/
