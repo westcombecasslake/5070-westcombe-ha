@@ -1,13 +1,20 @@
 # Safety & Monitoring Systems
 
-**Document Version:** 1.0  
-**Last Updated:** February 2026
+**Document Version:** 1.1  
+**Last Updated:** May 2026
 
 ---
 
 ## Overview
 
 The safety and monitoring subsystems provide 24/7 vigilance over life-safety systems, water intrusion, and critical home infrastructure. These systems prioritize reliability through redundant sensing, intelligent alerting, and comprehensive status tracking.
+
+**Automated Systems (in package order):**
+- Smoke & CO detection, HVAC/fan shutdown, all-clear recovery, and offline monitoring
+- Sump pump cycle tracking, failure detection, dry period notices, and resumed operation notices
+- Water leak detection and status tracking for three basement zones
+- Battery level monitoring with two-tier alerting across all battery-powered devices
+- Integration health monitoring and restart notification
 
 ---
 
@@ -217,7 +224,22 @@ Comprehensive monitoring with adaptive failure detection based on rainfall corre
 **Monthly Tracking:**
 - **Monthly Gallons** - Cumulative total, resets on 1st of month
 
+**Hours Since Last Cycle:**
+- Derived from `input_datetime.sump_pump_last_cycle_time`, which is stamped on every real pump activation
+- Uses the recorded datetime rather than sensor state change time, so connectivity glitches and HA restarts do not reset the clock
+
 ### Automation Logic
+
+#### Cycle Recording and Resumed Notice
+
+```yaml
+Trigger: Pump sensor off → on (real transition only, not unavailable → on)
+Actions:
+  - If idle > 24 hours: send Resumed notice to Operational Log
+  - Stamp input_datetime.sump_pump_last_cycle_time with current time
+```
+
+The resumed notice is evaluated and sent before the timestamp is updated, so the hours value in the notification reflects the actual idle duration.
 
 #### Daily Summary (11:55 PM)
 ```yaml
@@ -240,6 +262,7 @@ Condition:
   - Hours since last cycle > expected max idle
   - Rainfall in last 24 hrs > 0.1"
   - Rain is still occurring
+  - Alert has not fired within the last 4 hours
 Alert: House Alerts (HIGH PRIORITY)
 ```
 
@@ -298,15 +321,6 @@ Message: No pump activity in [X] hours
 
 **Purpose:** Informational awareness during dry spells. Not an alert since no pump activity is expected.
 
-#### Pump Resumed Notice
-
-```yaml
-Trigger: Pump cycles after 24+ hour idle
-Alert: Operational Log
-```
-
-**Purpose:** Confirms pump operation resumed after extended idle period.
-
 ### Configuration Parameters
 
 **User-Adjustable via Settings → Helpers:**
@@ -321,13 +335,18 @@ Alert: Operational Log
 - Resets: First of each month at midnight
 - Manual reset: Via Settings → Helpers if needed
 
+**`input_datetime.sump_pump_last_cycle_time`**
+- Automatically maintained
+- Set on every real pump activation
+- Manual set: Via Developer Tools → States if needed (format: YYYY-MM-DD HH:MM:SS)
+
 ### Monitoring Best Practices
 
 **Normal Operation Indicators:**
 - Cycles vary with rainfall
 - More cycles during/after rain
 - Fewer cycles during dry periods
-- Consistent cycle duration (Â±1-2 seconds)
+- Consistent cycle duration (±1-2 seconds)
 
 **Warning Signs:**
 - Continuous cycling (>10 cycles/hour sustained)

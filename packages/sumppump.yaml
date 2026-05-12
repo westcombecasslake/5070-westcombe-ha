@@ -28,8 +28,6 @@
 # Notes:
 # - Monthly total in notification calculated inline to include current day
 # - All input_number helpers persist across restarts (no initial: values)
-# - input_datetime.sump_pump_last_cycle_time persists last real on transition
-#   (used instead of last_changed to avoid false resets from availability events)
 ################################################################################
 
 input_number:
@@ -129,13 +127,29 @@ template:
 automation:
   - id: sump_pump_record_last_cycle
     alias: Sump Pump Record Last Cycle Time
-    description: Stamp input_datetime on real on transitions only (excludes unavailable→on)
+    description: >
+      Stamps input_datetime on real off-to-on transitions only, excluding
+      unavailable-to-on glitches. Resumed notice fires before the stamp so
+      the hours value still reflects the previous cycle time, not the new one.
     trigger:
       - platform: state
         entity_id: binary_sensor.sump_pump_running
         to: "on"
         from: "off"
     action:
+      - if:
+          - condition: template
+            value_template: >
+              {{ states('sensor.sump_pump_hours_since_last_cycle') | float(0) > 24 }}
+        then:
+          - service: notify.operational_log
+            data:
+              title: "✓ Sump Pump Resumed"
+              message: |
+                Pump cycled after {{ states('sensor.sump_pump_hours_since_last_cycle') | round(0) }} hours idle
+                Monitoring resumed
+
+                Sump Water Depth: {% if is_state('binary_sensor.sump_pump_depth_alert_door', 'off') %}Normal{% else %}HIGH!{% endif %} | Floor: {% if is_state('binary_sensor.sump_leak_sensor_moisture', 'on') %}WET!{% else %}Dry{% endif %}
       - service: input_datetime.set_datetime
         target:
           entity_id: input_datetime.sump_pump_last_cycle_time
@@ -272,29 +286,6 @@ automation:
             No pump activity in {{ states('sensor.sump_pump_hours_since_last_cycle') | round(0) }} hours
             No recent rain - likely normal
             
-            Sump Water Depth: {% if is_state('binary_sensor.sump_pump_depth_alert_door', 'off') %}Normal{% else %}HIGH!{% endif %} | Floor: {% if is_state('binary_sensor.sump_leak_sensor_moisture', 'on') %}WET!{% else %}Dry{% endif %}
-
-  - id: sump_pump_resumed_notice
-    alias: Sump Pump Resumed Notice
-    description: Notify when pump resumes after alert condition
-    mode: single
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.sump_pump_running
-        to: "on"
-        from: "off"
-    condition:
-      - condition: template
-        value_template: >
-          {{ states('sensor.sump_pump_hours_since_last_cycle') | float(0) > 24 }}
-    action:
-      - service: notify.operational_log
-        data:
-          title: "✓ Sump Pump Resumed"
-          message: |
-            Pump cycled after {{ states('sensor.sump_pump_hours_since_last_cycle') | round(0) }} hours idle
-            Monitoring resumed
-
             Sump Water Depth: {% if is_state('binary_sensor.sump_pump_depth_alert_door', 'off') %}Normal{% else %}HIGH!{% endif %} | Floor: {% if is_state('binary_sensor.sump_leak_sensor_moisture', 'on') %}WET!{% else %}Dry{% endif %}
 
   - id: sump_pump_high_water_alert
