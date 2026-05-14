@@ -156,7 +156,7 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 
 **Detection Phase (polling every 30 seconds):**
 - Tracks current humidity and maintains a rolling peak value
-- Detection fires when humidity has risen 8% above the pre-shower reference level (5% when ambient is at or above 50%). The reference freezes when humidity begins rising, so gradual shower rises are correctly detected even when the sensor reports frequently
+- Detection fires when humidity has risen above the peak by the threshold. Middle and east baths use 8% below 50% ambient and 5% above 50%. Master bath uses lower thresholds (5% below 50%, 3% above 50%) because the open floor plan allows steam to diffuse throughout the space before reaching the sensor, producing smaller rises than in the closed-door bathrooms
 - Baseline and peak are locked at detection time — baseline to the pre-rise peak, peak to the current humidity
 - Fan turns on immediately at detection
 
@@ -166,18 +166,16 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 - 2-hour safety timeout acts as a backstop in case the sequence is interrupted mid-run
 
 **Timeout Reset:**
-- If fan has been off for 15+ minutes, resets all tracking values (baseline, peak, loop start)
-- Uses native HA state duration check — no helper dependency
-- Prevents stale baseline/peak from causing false triggers on next shower
+- If no humidity updates for 15+ minutes with fan off, resets all tracking values
+- Prevents stale baseline/peak from causing false triggers
 
 **Manual Timer:**
-- If fan is manually turned on (baseline is 0, meaning not automation-triggered), checks every 5 minutes and auto-off after 30 minutes
-- Aborts mid-countdown if the humidity automation takes over, preventing the two from fighting over the fan
+- If fan is manually turned on (baseline is 0, meaning not automation-triggered), auto-off after 30 minutes
 - Independent of humidity-based control; useful for ventilation without showering
 
 **Startup Reset:**
-- On HA restart or automation reload, all tracking helpers are zeroed and the fan is turned off
-- Prevents stale helper values from triggering false detection after a restart or reload
+- On HA restart, all tracking helpers are zeroed and the fan is turned off
+- Prevents stale helper values from triggering false detection after a restart
 
 **HVAC Coordination:**
 - When fan cycle completes normally, calls `script.hvac_exhaust_boost`
@@ -200,9 +198,9 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 
 **Automations:**
 - `Master Bath Humidity - Shower Detection` — main polling loop
-- `Master Bath Humidity - Timeout` — resets helpers when fan has been off 15+ minutes
-- `Master Bath Fan - Manual Timer` — 30-minute auto-off for manual use, aborts if humidity takes over
-- `Master Bath Humidity - Startup Reset` — zeroes helpers on HA restart or automation reload
+- `Master Bath Humidity - Timeout` — stale value reset
+- `Master Bath Fan - Manual Timer` — 30-minute auto-off for manual use
+- `Master Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** masterbathhumidity.yaml
 
@@ -220,9 +218,9 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 
 **Automations:**
 - `Middle Bath Humidity - Shower Detection` — main polling loop
-- `Middle Bath Humidity - Timeout` — resets helpers when fan has been off 15+ minutes
-- `Middle Bath Fan - Manual Timer` — 30-minute auto-off for manual use, aborts if humidity takes over
-- `Middle Bath Humidity - Startup Reset` — zeroes helpers on HA restart or automation reload
+- `Middle Bath Humidity - Timeout` — stale value reset
+- `Middle Bath Fan - Manual Timer` — 30-minute auto-off for manual use
+- `Middle Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** middlebathhumidity.yaml
 
@@ -240,9 +238,9 @@ This pattern is deployed as separate YAML packages per bathroom, each with its o
 
 **Automations:**
 - `East Bath Humidity - Shower Detection` — main polling loop
-- `East Bath Humidity - Timeout` — resets helpers when fan has been off 15+ minutes
-- `East Bath Fan - Manual Timer` — 30-minute auto-off for manual use, aborts if humidity takes over
-- `East Bath Humidity - Startup Reset` — zeroes helpers on HA restart or automation reload
+- `East Bath Humidity - Timeout` — stale value reset
+- `East Bath Fan - Manual Timer` — 30-minute auto-off for manual use
+- `East Bath Humidity - Startup Reset` — zeroes helpers on HA restart
 
 **YAML:** eastbathhumidity.yaml
 
@@ -424,8 +422,9 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 - Manual off always works regardless of automation state
 
 **False trigger after HA restart or automation reload:**
-- Startup Reset automation handles this automatically on both HA restart and automation reload
-- If helpers appear stuck after a reload, manually zero `*_humidity_baseline`, `*_humidity_peak`, and `*_fan_loop_start` via Developer Tools → States for the affected bathroom
+- Helpers may retain stale values from a previous interrupted cycle
+- Startup reset automation handles this on full HA restart
+- For automation reload only: manually zero `*_humidity_baseline`, `*_humidity_peak`, and `*_fan_loop_start` via Developer Tools → States for the affected bathroom
 
 ---
 
