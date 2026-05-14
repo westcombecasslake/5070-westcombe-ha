@@ -11,7 +11,7 @@
 # - Daily runtime calculated at 6 AM using temperature + humidity (ET-based)
 # - Automatic cycle runs at 7:45 AM if system enabled and no rain forecast
 # - Manual 30-minute run available via dashboard button
-# - Deadman safety forces shutoff if valve stays on 90+ minutes
+# - Deadman safety forces shutoff if valve stays on 45+ minutes
 #
 # ET RUNTIME FORMULA:
 # - temp_factor  = ((temp - 40) * 0.6) + 8        range: ~8-46 min
@@ -21,10 +21,15 @@
 # - Examples: 55F/60%RH = 14 min | 70F/50%RH = 23 min | 90F/30%RH = 40 min
 #
 # WEATHER SKIP:
-# - Skips silently if system is disabled (seasonal shutoff)
+# - Silently skips if system is disabled (seasonal shutoff)
 # - Skips if current weather state is rainy/pouring/lightning-rainy/snowy-rainy
 # - Skips if today's or tomorrow's forecast condition is in the same bad list
 # - Note: Met.no does not provide precipitation probability (PoP) data
+#
+# DEADMAN RATIONALE:
+# - Maximum ET cycle: 40 minutes
+# - Maximum manual cycle: 30 minutes
+# - Deadman set at 45 minutes: 5 min buffer above longest legitimate run
 #
 # NOTIFICATIONS:
 # - operational_log: cycle start, cycle skip with reason (weather only)
@@ -92,6 +97,10 @@ automation:
     trigger:
       - platform: time
         at: "07:45:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_system_enabled
+        state: "on"
     action:
       - service: weather.get_forecasts
         target:
@@ -108,14 +117,7 @@ automation:
           humidity: "{{ forecast_data['weather.forecast_home_2']['forecast'][0].humidity }}"
           runtime: "{{ states('input_number.irrigation_zone_runtime') | int }}"
       - choose:
-          # Branch 1 - System disabled, silent skip
-          - conditions:
-              - condition: state
-                entity_id: input_boolean.irrigation_system_enabled
-                state: "off"
-            sequence: []
-
-          # Branch 2 - Current weather is bad
+          # Branch 1 - Current weather is bad
           - conditions:
               - condition: template
                 value_template: "{{ current_weather in bad_conditions }}"
@@ -130,7 +132,7 @@ automation:
                     Tomorrow: {{ tomorrow_condition }}
                     Time: {{ now().strftime('%I:%M %p') }}
 
-          # Branch 3 - Bad weather forecast today or tomorrow
+          # Branch 2 - Bad weather forecast today or tomorrow
           - conditions:
               - condition: template
                 value_template: >
@@ -197,6 +199,8 @@ automation:
 
   # --------------------------------------------------
   # Irrigation - Deadman Safety Off
+  #
+  # 45 min = 5 min buffer above max ET cycle (40 min)
   # --------------------------------------------------
   - id: irrigation_deadman_safety_off
     alias: "Irrigation - Deadman Safety Off"
@@ -204,13 +208,13 @@ automation:
       - platform: state
         entity_id: switch.patio_drip_sprinkler
         to: "on"
-        for: "01:30:00"
+        for: "00:45:00"
     action:
       - service: notify.house_alerts
         data:
           title: "Irrigation - Deadman Safety Triggered"
           message: >
-            Irrigation has been running for 90+ minutes!
+            Irrigation has been running for 45+ minutes!
             Forcing shutoff for safety.
 
             Check system for malfunction.

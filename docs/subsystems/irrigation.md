@@ -71,7 +71,8 @@ Example outputs: 55°F / 60% RH ≈ 14 min | 70°F / 50% RH ≈ 23 min | 90°F /
 - ID: `irrigation_automatic_morning_cycle`
 - `Irrigation - Automatic Morning Cycle`
 - Trigger: 7:45 AM daily
-- Logic: Fetches daily forecast; silently skips if system disabled; notifies and skips if current weather or today's/tomorrow's forecast condition is bad; otherwise runs irrigation for calculated runtime
+- Condition: System enabled
+- Logic: Fetches daily forecast; notifies and skips if current weather or today's/tomorrow's forecast condition is bad; otherwise runs irrigation for calculated runtime
 - Action: Runs irrigation for calculated runtime, sends operational log notification
 
 **YAML:** irrigation.yaml
@@ -82,9 +83,9 @@ Example outputs: 55°F / 60% RH ≈ 14 min | 70°F / 50% RH ≈ 23 min | 90°F /
 
 ### What It Does
 
-Provides a manual 30-minute irrigation run button for spot watering needs and enforces a deadman safety timer to automatically shut off irrigation after 90 minutes to prevent flooding from system failures.
+Provides a manual 30-minute irrigation run button for spot watering needs and enforces a deadman safety timer to automatically shut off irrigation after 45 minutes to prevent flooding from system failures.
 
-**Rationale:** Manual button is useful for testing, spot watering, or running outside the normal schedule. Deadman timer is a critical safety feature — prevents uncontrolled operation if automation fails, a valve sticks, or a system error occurs.
+**Rationale:** Manual button is useful for testing, spot watering, or running outside the normal schedule. Deadman timer is a critical safety feature — the maximum legitimate runtime is 40 minutes (ET cap) or 30 minutes (manual run). The deadman is set 5 minutes above that ceiling and should never fire during normal operation. It exists solely to catch stuck valves or automation failures.
 
 ### Hardware
 
@@ -96,7 +97,7 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 
 **User Controls:**
 - `input_button.irrigation_manual_30min` - Triggers 30-minute manual run
-- Maximum runtime enforced by deadman automation at 90 minutes
+- Maximum runtime enforced by deadman automation at 45 minutes
 
 ### Automations
 
@@ -111,9 +112,9 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 **Deadman Safety Off:**
 - ID: `irrigation_deadman_safety_off`
 - `Irrigation - Deadman Safety Off`
-- Trigger: Valve on for 90 minutes continuously
+- Trigger: Valve on for 45 minutes continuously
 - Action: Forces irrigation OFF, sends house alert
-- Safety: Prevents flooding from stuck valves or system failures
+- Safety: Should never fire during normal operation — only on malfunction or stuck valve
 - Always active whenever the valve is on
 
 **YAML:** irrigation.yaml
@@ -126,7 +127,7 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 
 **System Enable:**
 - `input_boolean.irrigation_system_enabled` - Master ON/OFF control
-  - OFF: Completely disables all irrigation (automatic and manual), silent skip at 7:45 AM
+  - OFF: Completely disables all irrigation (automatic and manual), silent with no notifications
   - ON: Enables weather-aware scheduling and manual control
   - Use during winterization or maintenance
 
@@ -138,7 +139,7 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 - `input_button.irrigation_manual_30min` - Triggers 30-minute manual run
   - Useful for testing or spot watering
   - Only works when system enabled
-  - Deadman safety forces shutoff after 90 minutes regardless
+  - Deadman safety forces shutoff after 45 minutes regardless
 
 ---
 
@@ -147,7 +148,7 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 **Pushover Operational Log** (`notify.operational_log`):
 - Automatic cycle started: includes runtime, today's forecasted high, humidity, and forecast conditions
 - Cycle skipped due to weather: includes reason, today's forecasted high, humidity, and forecast conditions
-- System disabled skip: silent, no notification
+- System disabled: silent, no notification in either direction
 - Priority: Low (informational)
 
 **Pushover House Notices** (`notify.house_notices`):
@@ -155,8 +156,8 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 - Priority: Normal (awareness)
 
 **Pushover House Alerts** (`notify.house_alerts`):
-- Irrigation deadman safety shutoff triggered
-- Priority: High (indicates possible system malfunction)
+- Irrigation deadman safety shutoff triggered (indicates malfunction)
+- Priority: High
 
 ---
 
@@ -184,7 +185,7 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 
 **Runtime seems too high or too low:**
 - ET formula uses forecasted high temperature and humidity from `weather.forecast_home_2`
-- Check that today's forecast values look reasonable in Developer Tools
+- Check that today's forecast values look reasonable in Developer Tools → Actions → weather.get_forecasts
 - Manual adjustment of `input_number.irrigation_zone_runtime` is possible if needed
 - Expected range: ~14 min (cool/humid) to 40 min (hot/dry)
 
@@ -194,7 +195,7 @@ Provides a manual 30-minute irrigation run button for spot watering needs and en
 - Review automation trace for manual run automation
 
 **System won't turn off:**
-- Deadman timer forces off after 90 minutes
+- Deadman timer forces off after 45 minutes
 - If valve is physically stuck, check valve wiring and solenoid
 - Can manually turn off via `switch.patio_drip_sprinkler`
 - Disable system via `input_boolean.irrigation_system_enabled`
