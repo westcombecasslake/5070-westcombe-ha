@@ -1,8 +1,5 @@
 # Safety & Monitoring Systems
 
-**Document Version:** 1.1  
-**Last Updated:** May 2026
-
 ---
 
 ## Overview
@@ -235,7 +232,7 @@ Comprehensive monitoring with adaptive failure detection based on rainfall corre
 ```yaml
 Trigger: Pump sensor off → on (real transition only, not unavailable → on)
 Actions:
-  - If idle > 24 hours: send Resumed notice to Operational Log
+  - If idle > 36 hours: send Resumed notice to Operational Log
   - Stamp input_datetime.sump_pump_last_cycle_time with current time
 ```
 

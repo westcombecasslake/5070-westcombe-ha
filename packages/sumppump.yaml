@@ -140,7 +140,7 @@ automation:
       - if:
           - condition: template
             value_template: >
-              {{ states('sensor.sump_pump_hours_since_last_cycle') | float(0) > 24 }}
+              {{ states('sensor.sump_pump_hours_since_last_cycle') | float(0) > 36 }}
         then:
           - service: notify.operational_log
             data:
