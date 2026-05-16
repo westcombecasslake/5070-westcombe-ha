@@ -10,6 +10,17 @@ The Environmental Control subsystem manages indoor humidity and air quality thro
 
 The subsystem prevents common household issues like mold growth, dry air discomfort, and excessive energy costs by responding to real-time sensor data and seasonal patterns.
 
+### Systems
+
+- **Humidifier Pad Monitoring** — Tracks whole-house humidifier pad degradation via 7/14-day rolling humidity averages; alerts when replacement is needed
+- **Basement Dehumidifier Control** — Maintains 45–50% basement humidity; avoids weekday peak electricity hours (Mon–Fri 3–7 PM)
+- **Bathroom Humidity Control** — Detects showers by humidity rise and runs exhaust fan for a fixed 30-minute cycle, followed by an HVAC fan boost
+  - Master Bath
+  - Middle Bath
+  - East Suite Bath
+- **Entry Fan Coordination** — Simple 12-minute auto-off timer for the entry bathroom (no humidity sensor)
+- **Laundry Dryer Fan Control** — Runs laundry exhaust fan during and after dryer cycles based on temperature cooldown tracking
+
 ---
 
 ## Humidifier Pad Monitoring
@@ -111,15 +122,28 @@ Automatically controls basement dehumidifier outlet to maintain 45-50% humidity 
 **Turn On:**
 - `basement_dehumidifier_on`
 - Trigger: Humidity rises above 50%
-- Condition: Outside peak hours (Mon-Fri 3-7 PM blocked)
-- Action: Turn on outlet, send notification
+- Condition: Switch currently off; outside peak hours (Mon-Fri 3-7 PM blocked)
+- Action: Turn on outlet
 - Operates anytime on weekends
 
 **Turn Off:**
 - `basement_dehumidifier_off`
 - Trigger: Humidity falls below 45% OR peak hours start (3 PM Mon-Fri)
-- Action: Turn off outlet, send notification
+- Condition: Switch currently on
+- Action: Turn off outlet
 - Prevents operation during expensive peak rate periods
+
+**Notify High Humidity:**
+- `basement_dehumidifier_notify_on`
+- Trigger: Humidity rises above 50%
+- Condition: Switch currently off (prevents repeat notifications while dehumidifier is already running)
+- Action: Operational log notification
+- Decoupled from switch control — peak hour suppression is silent
+
+**Notify Normal Humidity:**
+- `basement_dehumidifier_notify_off`
+- Trigger: Humidity falls below 45%
+- Action: Operational log notification
 
 **YAML:** basementdehumidifiercontrol.yaml
 
@@ -405,6 +429,10 @@ All bathroom humidity helpers are auto-managed by their respective automations. 
 - Check current time - blocked Mon-Fri 3-7 PM
 - Verify `sensor.basement_humidity_sensor_humidity` is reporting correctly
 - Check `switch.scheduled_power_save` responds to manual control
+
+**Basement dehumidifier sending repeat high-humidity notifications:**
+- Verify the updated YAML (May 2026) is deployed — the notify_on automation requires a switch state condition (`state: "off"`) to prevent re-notification while the dehumidifier is already running
+- Reload Automations after deploying
 
 **Bathroom fan not triggering on shower** (applies to any bathroom instance):
 - Check that the humidity sensor is updating — use Developer Tools → Template to verify the sensor is reporting recent values

@@ -21,11 +21,11 @@
 # - Allowed: All other times including full weekends
 #
 # NOTIFICATIONS:
-# - Notifies immediately when humidity crosses above 50% (regardless of peak hours)
+# - Notifies immediately when humidity crosses above 50% AND switch is currently off
 # - Notifies immediately when humidity crosses below 45% (regardless of switch state)
 # - Notifications are decoupled from switch control — peak hour suppression is silent
-# - Sensor bounce cannot cause repeat notifications (numeric_state trigger only
-#   fires once per threshold crossing — requires round-trip before re-triggering)
+# - Sensor bounce cannot cause repeat notifications (switch state guard prevents
+#   re-notification while dehumidifier is already running)
 # - No notification for peak hour shutoff (3 PM Mon-Fri)
 #
 ###############################################################################
@@ -37,7 +37,7 @@ automation:
         entity_id: sensor.basement_humidity_sensor_humidity
         above: 50
     condition:
-      - condition: state          # only act if switch is currently off
+      - condition: state # only act if switch is currently off
         entity_id: switch.scheduled_power_save
         state: "off"
       - condition: or
@@ -74,7 +74,7 @@ automation:
         at: "15:00:00"
         id: time_trigger
     condition:
-      - condition: state          # only act if switch is currently on
+      - condition: state # only act if switch is currently on
         entity_id: switch.scheduled_power_save
         state: "on"
       - condition: or
@@ -105,6 +105,10 @@ automation:
       - platform: numeric_state
         entity_id: sensor.basement_humidity_sensor_humidity
         above: 50
+    condition:
+      - condition: state # only notify if dehumidifier is not already running
+        entity_id: switch.scheduled_power_save
+        state: "off"
     action:
       - service: notify.operational_log
         data:
